@@ -23,6 +23,7 @@ the brief it was built from.
 - **Blueprint editor** — build or rework blueprints from scratch on their own canvas ("New blueprint" / "Edit" in the Blueprints tab): all normal tools work there (add, connect, grid route, flags, markers, undo), a crosshair marks the stamp anchor, and Save & close returns you to your map exactly as you left it.
 - **Flags** — toggle subprio (pathfinding cost ×20) and traffic-system flags per selection; subprio nodes render yellow.
 - **Markers & groups** — create, rename, and delete map markers and organize them into groups.
+- **Copy / cut / paste** — `Ctrl+C`, `Ctrl+X`, `Ctrl+V` (or the buttons in the Selection tab) move a selection with its internal connections, flags and markers. A paste lands beside the original, scaled to the size of what was copied and rounded to whole grid cells so it keeps the original's alignment, and arrives selected so it can be dragged into place. Repeated pastes walk further out. The clipboard survives switching into the blueprint editor, so a piece of a map can be pasted there and saved as a blueprint.
 - **Merge stacked nodes** — the File tab counts waypoints sitting on the exact same X/Z (a blueprint stamped twice, two routes joined, a node snapped onto another) and folds each stack into one node with a button. Connections, flags and markers of the whole stack move to the survivor, and it is undoable.
 - **Route tools** — insert midpoint on a connection, distribute a run of nodes evenly, generate a smooth curve between two nodes (tangents follow the adjoining roads).
 - **Savegame map background** — opening an `AutoDrive_config.xml` inside a savegame folder automatically renders the map's terrain under the network: a hillshaded elevation view decoded from the save's 16-bit `terrain.heightmap.png`, plus placeable and vehicle icons from the save. New nodes get their height (`y`) sampled from the real terrain. Opacity and icons are adjustable in the File tab; a folder can also be picked manually.
@@ -40,20 +41,21 @@ Your routes live in `Documents/My Games/FarmingSimulator2025/savegame#/AutoDrive
 
 ### Controls
 
-| Input                               | Action                                                                                             |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `1`–`4`                             | Tools: Select, Add nodes, Connect, Grid route                                                      |
-| Mouse wheel                         | Zoom to cursor                                                                                     |
-| Middle/right drag                   | Pan                                                                                                |
-| Left click / drag                   | Select, move selection, box select (`Shift` adds)                                                  |
-| `Ctrl`+click (Add tool)             | Place node connected to the previous one                                                           |
-| Click node A, then B (Connect tool) | Connect with the active mode; clicking again cycles one-way → other way → two-way → reverse → none |
-| `R` / `Shift`+`R`                   | Rotate blueprint ghost while placing                                                               |
-| `G`                                 | Toggle grid snap                                                                                   |
-| `Ctrl`+`Z` / `Ctrl`+`Y`             | Undo / redo                                                                                        |
-| `Ctrl`+`S` / `Ctrl`+`Shift`+`S`     | Save / Save As                                                                                     |
-| `Delete`                            | Delete selection                                                                                   |
-| `Esc`                               | Cancel placement / pending connection / selection                                                  |
+| Input                                | Action                                                                                             |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `1`–`4`                              | Tools: Select, Add nodes, Connect, Grid route                                                      |
+| Mouse wheel                          | Zoom to cursor                                                                                     |
+| Middle/right drag                    | Pan                                                                                                |
+| Left click / drag                    | Select, move selection, box select (`Shift` adds)                                                  |
+| `Ctrl`+click (Add tool)              | Place node connected to the previous one                                                           |
+| Click node A, then B (Connect tool)  | Connect with the active mode; clicking again cycles one-way → other way → two-way → reverse → none |
+| `R` / `Shift`+`R`                    | Rotate blueprint ghost while placing                                                               |
+| `G`                                  | Toggle grid snap                                                                                   |
+| `Ctrl`+`Z` / `Ctrl`+`Y`              | Undo / redo                                                                                        |
+| `Ctrl`+`S` / `Ctrl`+`Shift`+`S`      | Save / Save As                                                                                     |
+| `Ctrl`+`C` / `Ctrl`+`X` / `Ctrl`+`V` | Copy / cut / paste the selection                                                                   |
+| `Delete`                             | Delete selection                                                                                   |
+| `Esc`                                | Cancel placement / pending connection / selection                                                  |
 
 ## How AutoDrive stores its network
 

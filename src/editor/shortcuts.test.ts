@@ -29,6 +29,7 @@ beforeEach(() => {
     s.pendingConnectFrom = null;
     s.blueprintEdit = null;
     s.background = null;
+    s.clipboard = null;
     s.settings.snapEnabled = true;
   });
   store.clearHistory();
@@ -120,5 +121,39 @@ describe("handleShortcut", () => {
   it("leaves unknown combinations to the browser", () => {
     expect(press("p", { ctrlKey: true })).toBe(false);
     expect(press("F5")).toBe(false);
+  });
+});
+
+describe("clipboard shortcuts", () => {
+  it("copies, cuts and pastes", () => {
+    const a = addNode(0, 0, null, "oneway");
+    addNode(10, 0, a, "oneway");
+    selectAll();
+
+    expect(press("c", { ctrlKey: true })).toBe(true);
+    expect(store.state.clipboard?.blueprint.nodes).toHaveLength(2);
+
+    expect(press("v", { ctrlKey: true })).toBe(true);
+    expect(store.state.network.waypoints.size).toBe(4);
+
+    selectAll();
+    expect(press("x", { ctrlKey: true })).toBe(true);
+    expect(store.state.network.waypoints.size).toBe(0);
+    expect(store.state.clipboard?.blueprint.nodes).toHaveLength(4);
+  });
+
+  it("leaves copying real text to the browser", () => {
+    addNode(0, 0, null, "oneway");
+    selectAll();
+    const spy = vi.spyOn(window, "getSelection").mockReturnValue({
+      toString: () => "some selected prose",
+    } as unknown as Selection);
+
+    try {
+      expect(press("c", { ctrlKey: true })).toBe(false);
+      expect(store.state.clipboard).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

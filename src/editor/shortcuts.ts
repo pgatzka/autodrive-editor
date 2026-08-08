@@ -1,5 +1,12 @@
 import { openConfig, saveConfig } from "../files/fileio";
-import { cancelCurrentInteraction, requestDeleteSelection, selectAll } from "../state/actions";
+import {
+  cancelCurrentInteraction,
+  copySelection,
+  cutSelection,
+  pasteClipboard,
+  requestDeleteSelection,
+  selectAll,
+} from "../state/actions";
 import { saveBlueprintEditor } from "../state/blueprintSession";
 import { setShortcutsOpen } from "../state/feedback";
 import { store, Tool } from "../state/store";
@@ -37,9 +44,25 @@ function handleModified(event: KeyboardEvent): boolean {
     case "a":
       selectAll();
       return true;
+    case "c":
+      // let the browser copy real text when the user has some selected
+      if (hasTextSelection()) return false;
+      copySelection();
+      return true;
+    case "x":
+      if (hasTextSelection()) return false;
+      cutSelection();
+      return true;
+    case "v":
+      pasteClipboard();
+      return true;
     default:
       return false;
   }
+}
+
+function hasTextSelection(): boolean {
+  return (window.getSelection()?.toString().length ?? 0) > 0;
 }
 
 function handlePlain(event: KeyboardEvent): boolean {

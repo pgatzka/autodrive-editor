@@ -1,5 +1,5 @@
 import { nodeHeightAt } from "../model/background";
-import { stampBlueprint } from "../model/blueprint";
+import { blueprintSpan, captureBlueprint, centroidOf, stampBlueprint } from "../model/blueprint";
 import {
   addWaypoint,
   connect,
@@ -197,19 +197,93 @@ function describeImpact(impact: ReturnType<typeof deletionImpact>): string {
 }
 
 export function deleteSelection(): void {
+  removeSelection("Deleted");
+}
+
+/** Delete, phrased by what the user asked for — a cut still has its copy. */
+function removeSelection(verb: "Deleted" | "Cut"): void {
   const state = store.state;
   if (state.selection.size === 0) return;
   const impact = deletionImpact(state.network, state.selection);
+  const headline = `${verb} ${plural(impact.nodes, "waypoint")}`;
 
   store.mutate((s) => {
     deleteWaypoints(s.network, s.selection);
     s.selection = new Set();
     s.pendingDeletion = null;
-    s.statusMessage = `Deleted ${impact.nodes} waypoints`;
+    s.statusMessage = headline;
   });
-  showToast("danger", `Deleted ${impact.nodes} waypoints`, {
-    detail: `${impact.connections} connections removed`,
+  showToast("danger", headline, {
+    detail: `${plural(impact.connections, "connection")} removed`,
     undo: () => store.undo(),
+  });
+}
+
+// ---- clipboard ----
+
+/** A paste steps at least this far, so the copy is never hidden under the original. */
+export const MIN_PASTE_OFFSET_M = 2;
+/** …and at least this much of what was pasted, so the two stay told apart. */
+export const PASTE_OFFSET_FRACTION = 0.25;
+
+/**
+ * How far a paste moves from what it was copied from. The step is a quarter
+ * of the copied footprint, so a long route lands clear of the original and a
+ * short one stays near it, rounded up to whole grid cells so the copy keeps
+ * the alignment the original had.
+ */
+export function pasteStep(gridSize: number, spanMeters: number): number {
+  const cell = gridSize > 0 ? gridSize : MIN_PASTE_OFFSET_M;
+  const wanted = Math.max(MIN_PASTE_OFFSET_M, spanMeters * PASTE_OFFSET_FRACTION);
+  return Math.ceil(wanted / cell - 1e-9) * cell;
+}
+
+/**
+ * Copy the selection — nodes, the connections among them, flags and markers.
+ * The clipboard outlives the blueprint workspace, so a piece of a map can be
+ * copied and pasted in there to become a blueprint.
+ */
+export function copySelection(): boolean {
+  const { network, selection } = store.state;
+  // both are null in the same case — an empty selection
+  const origin = centroidOf(network, selection);
+  const blueprint = captureBlueprint(network, selection, "Clipboard", origin ?? undefined);
+  if (!origin || !blueprint) {
+    store.update((s) => (s.statusMessage = "Nothing selected to copy"));
+    return false;
+  }
+
+  store.update((s) => {
+    s.clipboard = { blueprint, origin, pastes: 0 };
+    s.statusMessage = `Copied ${plural(blueprint.nodes.length, "waypoint")}`;
+  });
+  return true;
+}
+
+export function cutSelection(): void {
+  if (!copySelection()) return;
+  removeSelection("Cut");
+}
+
+/**
+ * Paste beside where the nodes came from and select the copy, so it can be
+ * dragged into place straight away. Pasting repeatedly walks further out
+ * instead of stacking copies on one spot.
+ */
+export function pasteClipboard(): void {
+  const clipboard = store.state.clipboard;
+  if (!clipboard) return;
+
+  const span = blueprintSpan(clipboard.blueprint);
+  const step = pasteStep(store.state.settings.gridSize, span) * (clipboard.pastes + 1);
+  const x = clipboard.origin.x + step;
+  const z = clipboard.origin.z + step;
+
+  store.mutate((s) => {
+    const ids = stampBlueprint(s.network, clipboard.blueprint, { x, z, rotation: 0 }, heightAt(x, z));
+    s.selection = new Set(ids);
+    s.clipboard = { ...clipboard, pastes: clipboard.pastes + 1 };
+    s.statusMessage = `Pasted ${plural(ids.length, "waypoint")} — drag to position, Ctrl+Z undoes`;
   });
 }
 

@@ -69,6 +69,26 @@ try {
   });
   check(selected === 2, `box select picked both nodes (got ${selected})`);
 
+  // copy the pair with the keyboard, paste it, then undo the paste
+  await page.keyboard.press("Control+c");
+  await page.keyboard.press("Control+v");
+  const afterPaste = await page.evaluate(async () => {
+    const { store } = await import("/src/state/store.ts");
+    return {
+      nodes: store.state.network.waypoints.size,
+      selected: store.state.selection.size,
+      copied: store.state.clipboard?.blueprint.nodes.length ?? 0,
+    };
+  });
+  check(afterPaste.copied === 2, `clipboard holds the copy (got ${afterPaste.copied})`);
+  check(afterPaste.nodes === 4, `paste added a copy (got ${afterPaste.nodes} nodes)`);
+  check(afterPaste.selected === 2, "the pasted copy is what is selected");
+  await page.keyboard.press("Control+z");
+  await page.mouse.move(300, 200);
+  await page.mouse.down();
+  await page.mouse.move(600, 400, { steps: 5 });
+  await page.mouse.up();
+
   await page.keyboard.press("Delete");
   const afterDelete = await page.evaluate(async () => {
     const { store } = await import("/src/state/store.ts");

@@ -17,10 +17,7 @@ export function captureBlueprint(
   name: string,
   anchor?: { x: number; z: number }
 ): Blueprint | null {
-  const nodes = Array.from(ids)
-    .map((id) => net.waypoints.get(id))
-    .filter((wp): wp is Waypoint => wp !== undefined)
-    .sort((a, b) => a.id - b.id);
+  const nodes = nodesOf(net, ids);
   if (nodes.length === 0) return null;
 
   const origin = captureOrigin(nodes, anchor);
@@ -43,6 +40,25 @@ export function captureBlueprint(
   };
 }
 
+/** The selected nodes, in id order. */
+function nodesOf(net: RouteNetwork, ids: Iterable<number>): Waypoint[] {
+  return Array.from(ids)
+    .map((id) => net.waypoints.get(id))
+    .filter((wp): wp is Waypoint => wp !== undefined)
+    .sort((a, b) => a.id - b.id);
+}
+
+/**
+ * Where a set of nodes sits on the map. This is the anchor a capture from the
+ * map uses, and the point a paste offsets from.
+ */
+export function centroidOf(net: RouteNetwork, ids: Iterable<number>): { x: number; z: number } | null {
+  const nodes = nodesOf(net, ids);
+  if (nodes.length === 0) return null;
+  const centre = meanOf(nodes);
+  return { x: centre.x, z: centre.z };
+}
+
 /**
  * Heights always stay relative to the mean, since stamping re-bases them on
  * the terrain; only the horizontal anchor is caller-controlled.
@@ -51,19 +67,24 @@ function captureOrigin(
   nodes: Waypoint[],
   anchor?: { x: number; z: number }
 ): { x: number; y: number; z: number } {
-  let cx = 0;
-  let cy = 0;
-  let cz = 0;
-  for (const node of nodes) {
-    cx += node.x;
-    cy += node.y;
-    cz += node.z;
-  }
+  const centre = meanOf(nodes);
   return {
-    x: anchor ? anchor.x : cx / nodes.length,
-    y: cy / nodes.length,
-    z: anchor ? anchor.z : cz / nodes.length,
+    x: anchor ? anchor.x : centre.x,
+    y: centre.y,
+    z: anchor ? anchor.z : centre.z,
   };
+}
+
+function meanOf(nodes: Waypoint[]): { x: number; y: number; z: number } {
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (const node of nodes) {
+    x += node.x;
+    y += node.y;
+    z += node.z;
+  }
+  return { x: x / nodes.length, y: y / nodes.length, z: z / nodes.length };
 }
 
 /** Connections among the captured nodes, dual links emitted once. */
@@ -87,6 +108,22 @@ function captureEdges(
     }
   }
   return edges;
+}
+
+/** The longer side of a blueprint's footprint, in meters. */
+export function blueprintSpan(bp: Blueprint): number {
+  if (bp.nodes.length === 0) return 0;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const node of bp.nodes) {
+    minX = Math.min(minX, node.x);
+    maxX = Math.max(maxX, node.x);
+    minZ = Math.min(minZ, node.z);
+    maxZ = Math.max(maxZ, node.z);
+  }
+  return Math.max(maxX - minX, maxZ - minZ);
 }
 
 export interface Placement {

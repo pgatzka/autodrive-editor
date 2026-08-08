@@ -65,6 +65,7 @@ const SHORTCUTS: readonly { action: string; keys: string[] }[] = [
   { action: "Undo · Redo", keys: ["Ctrl+Z", "Ctrl+Y"] },
   { action: "Save", keys: ["Ctrl+S"] },
   { action: "Select all", keys: ["Ctrl+A"] },
+  { action: "Copy · Cut · Paste", keys: ["Ctrl+C", "Ctrl+X", "Ctrl+V"] },
   { action: "Delete selection", keys: ["Del"] },
   { action: "Cancel / finish mode", keys: ["Esc"] },
 ] as const;

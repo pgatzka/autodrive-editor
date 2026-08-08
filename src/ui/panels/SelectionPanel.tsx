@@ -5,14 +5,17 @@ import { plural } from "../../model/text";
 import {
   alignGridToWaypoint,
   connectNodes,
+  copySelection,
   createSmoothCurve,
+  cutSelection,
   disconnectNodes,
   insertMidpointBetween,
+  pasteClipboard,
   requestDeleteSelection,
   setSelectionFlag,
   spaceSelectionEvenly,
 } from "../../state/actions";
-import { store } from "../../state/store";
+import { ClipboardContents, store } from "../../state/store";
 import { useStore } from "../../state/useStore";
 import { Button, EmptyState, NumberInput, Section, Toggle } from "../components/controls";
 import { MarkerEditor } from "./MarkerEditor";
@@ -31,9 +34,17 @@ export function SelectionPanel() {
 
   if (selected.length === 0) {
     return (
-      <EmptyState title="Nothing selected">
-        Click a waypoint, or drag a box on the map. Shift-click adds to the selection.
-      </EmptyState>
+      <>
+        <EmptyState title="Nothing selected">
+          Click a waypoint, or drag a box on the map. Shift-click adds to the selection.
+        </EmptyState>
+        {/* the clipboard is the one thing that can still be acted on here */}
+        {state.clipboard && (
+          <Section>
+            <PasteButton clipboard={state.clipboard} />
+          </Section>
+        )}
+      </>
     );
   }
 
@@ -44,6 +55,7 @@ export function SelectionPanel() {
       ) : (
         <GroupIdentity selected={selected} />
       )}
+      <Clipboard selected={selected} />
       <Flags selected={selected} />
       {selected.length === 1 && <GridAlignment waypoint={selected[0]} />}
       {selected.length === 1 && <MarkerEditor wpId={selected[0].id} />}
@@ -127,6 +139,42 @@ function GridAlignment({ waypoint }: { waypoint: Waypoint }) {
         {aligned ? "Grid aligned to this waypoint" : "Align grid to this waypoint"}
       </Button>
     </Section>
+  );
+}
+
+/**
+ * Copy carries the nodes, the connections among them, their flags and their
+ * markers — the same payload a blueprint holds, so a copy can also be pasted
+ * into the blueprint workspace.
+ */
+function Clipboard({ selected }: { selected: Waypoint[] }) {
+  const state = useStore();
+
+  return (
+    <Section>
+      <div className="field-row">
+        <Button wide shortcut="Ctrl+C" onClick={() => copySelection()}>
+          Copy
+        </Button>
+        <Button wide shortcut="Ctrl+X" onClick={() => cutSelection()}>
+          Cut {plural(selected.length, "node")}
+        </Button>
+      </div>
+      {state.clipboard && <PasteButton clipboard={state.clipboard} />}
+    </Section>
+  );
+}
+
+function PasteButton({ clipboard }: { clipboard: ClipboardContents }) {
+  return (
+    <Button
+      wide
+      shortcut="Ctrl+V"
+      title="Paste beside where the nodes were copied from"
+      onClick={() => pasteClipboard()}
+    >
+      Paste {plural(clipboard.blueprint.nodes.length, "waypoint")}
+    </Button>
   );
 }
 

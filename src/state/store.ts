@@ -49,6 +49,19 @@ export interface EditorSettings {
   showIcons: boolean;
 }
 
+/**
+ * Copied nodes waiting to be pasted. The payload is a blueprint — the same
+ * shape the library stores — so copy/paste and stamping share one
+ * implementation of "these nodes, relative to a point".
+ */
+export interface ClipboardContents {
+  blueprint: Blueprint;
+  /** where the nodes were copied from, so a paste lands beside the original */
+  origin: { x: number; z: number };
+  /** pastes made from this clipboard, so repeated pastes cascade */
+  pastes: number;
+}
+
 export interface PendingPlacement {
   blueprint: Blueprint;
   rotation: number;
@@ -85,6 +98,8 @@ export interface EditorState {
   /** first node picked in connect / gridroute tools */
   pendingConnectFrom: number | null;
   placement: PendingPlacement | null;
+  /** survives the blueprint workspace, so nodes can be copied into it */
+  clipboard: ClipboardContents | null;
   blueprints: Blueprint[];
   /** non-null while the blueprint editor is open */
   blueprintEdit: BlueprintEditSession | null;
@@ -144,6 +159,7 @@ export class EditorStore {
     },
     pendingConnectFrom: null,
     placement: null,
+    clipboard: null,
     blueprints: [],
     blueprintEdit: null,
     background: null,

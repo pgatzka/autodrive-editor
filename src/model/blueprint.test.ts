@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  blueprintSpan,
   blueprintToNetwork,
   captureBlueprint,
+  centroidOf,
   isBlueprint,
   placedPositions,
   stampBlueprint,
@@ -117,5 +119,27 @@ describe("isBlueprint", () => {
     expect(isBlueprint(captureBlueprint(net, new Set(ids), "x"))).toBe(true);
     expect(isBlueprint({ name: "x" })).toBe(false);
     expect(isBlueprint(null)).toBe(false);
+  });
+});
+
+describe("centroidOf", () => {
+  it("gives the horizontal centre of a selection", () => {
+    // the L spans -10..0 on x and 0..10 on z
+    expect(centroidOf(net, ids)).toEqual({ x: -10 / 3, z: 10 / 3 });
+  });
+
+  it("has no centre for an empty selection", () => {
+    expect(centroidOf(net, [])).toBeNull();
+    expect(centroidOf(net, [999])).toBeNull();
+  });
+});
+
+describe("blueprintSpan", () => {
+  it("measures the longer side of the footprint", () => {
+    expect(blueprintSpan(captureBlueprint(net, new Set(ids), "L")!)).toBe(10);
+  });
+
+  it("is zero for a single node", () => {
+    expect(blueprintSpan(captureBlueprint(net, new Set([ids[0]]), "one")!)).toBe(0);
   });
 });
