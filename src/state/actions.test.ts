@@ -13,6 +13,7 @@ import {
   focusOnWaypoint,
   gridRoute,
   insertMidpointBetween,
+  mergeStackedNodes,
   resetGridOffset,
   selectAll,
   setSelection,
@@ -261,5 +262,45 @@ describe("disconnectNodes", () => {
 
     disconnectNodes(a, b);
     expect(connectionBetween(store.state.network, a, b)).toBeNull();
+  });
+});
+
+describe("mergeStackedNodes", () => {
+  it("folds nodes sharing a spot into one and selects what is left", () => {
+    const a = addNode(0, 0, null, "oneway");
+    const b = addNode(10, 0, a, "oneway");
+    // a second node dropped on b, linked onwards
+    const dupe = addNode(10, 0, null, "oneway");
+    const c = addNode(20, 0, dupe, "oneway");
+
+    mergeStackedNodes();
+
+    expect(store.state.network.waypoints.has(dupe)).toBe(false);
+    expect(connectionBetween(store.state.network, a, b)).not.toBeNull();
+    expect(connectionBetween(store.state.network, b, c)).not.toBeNull();
+    expect(store.state.selection).toEqual(new Set([b]));
+    expect(store.state.statusMessage).toMatch(/Merged 1 stacked node/);
+  });
+
+  it("is undoable in one step", () => {
+    addNode(0, 0, null, "oneway");
+    addNode(0, 0, null, "oneway");
+
+    mergeStackedNodes();
+    expect(store.state.network.waypoints.size).toBe(1);
+
+    store.undo();
+    expect(store.state.network.waypoints.size).toBe(2);
+  });
+
+  it("says so and changes nothing when no nodes are stacked", () => {
+    addNode(0, 0, null, "oneway");
+    const version = store.getVersion();
+
+    mergeStackedNodes();
+
+    expect(store.state.statusMessage).toBe("No stacked nodes found");
+    expect(store.getVersion()).toBe(version + 1);
+    expect(store.state.network.waypoints.size).toBe(1);
   });
 });

@@ -10,12 +10,16 @@ import {
   deletionImpact,
   disconnect,
   evenlySpaceChain,
+  findStackedGroups,
   insertMidpoint,
+  MergeResult,
+  mergeStacked,
   orderAsChain,
   setFlagOn,
   smoothCurve,
 } from "../model/graph";
 import { offsetForPosition } from "../model/grid";
+import { plural } from "../model/text";
 import { ConnectionMode } from "../model/types";
 import { closeDialog, confirmAction, showToast } from "./feedback";
 import { store } from "./store";
@@ -109,6 +113,42 @@ export function spaceSelectionEvenly(ids: Iterable<number>): void {
     evenlySpaceChain(s.network, chain);
     s.statusMessage = `Spaced ${chain.length} nodes evenly`;
   });
+}
+
+/**
+ * Fold every stack of nodes sharing a spot into one node. Nodes vanish here,
+ * so the toast carries Undo the way a delete does, and the survivors are
+ * selected — they are the only evidence left that anything happened.
+ */
+export function mergeStackedNodes(): void {
+  const groups = findStackedGroups(store.state.network);
+  if (groups.length === 0) {
+    store.update((s) => (s.statusMessage = "No stacked nodes found"));
+    return;
+  }
+
+  let result = { groups: 0, nodes: 0, connections: 0, markers: 0 };
+  store.mutate((s) => {
+    result = mergeStacked(s.network, groups);
+    s.selection = new Set(groups.map((group) => group.keepId));
+    s.statusMessage = mergeHeadline(result);
+  });
+  showToast("info", mergeHeadline(result), {
+    detail: describeMerge(result),
+    undo: () => store.undo(),
+  });
+}
+
+function mergeHeadline(result: MergeResult): string {
+  return `Merged ${plural(result.nodes, "stacked node")} at ${plural(result.groups, "spot")}`;
+}
+
+/** What the merge cost, so nothing disappears without being named. */
+function describeMerge(result: MergeResult): string {
+  const parts: string[] = [];
+  if (result.connections > 0) parts.push(`${plural(result.connections, "duplicate link")} removed`);
+  if (result.markers > 0) parts.push(`${plural(result.markers, "marker")} dropped`);
+  return parts.length > 0 ? parts.join(", ") : "Every connection and marker kept";
 }
 
 /** Above this many nodes a delete asks first, so the dialog never becomes noise. */

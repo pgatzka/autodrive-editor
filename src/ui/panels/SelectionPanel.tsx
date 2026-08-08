@@ -1,6 +1,7 @@
 import { connectionBetween } from "../../model/graph";
 import { FLAG_SUBPRIO, FLAG_TRAFFIC_SYSTEM, Waypoint } from "../../model/types";
 import { wrapOffset } from "../../model/grid";
+import { plural } from "../../model/text";
 import {
   alignGridToWaypoint,
   connectNodes,
@@ -209,7 +210,7 @@ function RouteTools({ selected }: { selected: Waypoint[] }) {
       </div>
       {/* the only red control in the panel, and it is last */}
       <Button variant="danger" wide shortcut="Del" onClick={() => requestDeleteSelection()}>
-        Delete {selected.length} waypoint{selected.length === 1 ? "" : "s"}
+        Delete {plural(selected.length, "waypoint")}
       </Button>
     </Section>
   );

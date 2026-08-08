@@ -150,6 +150,39 @@ try {
     `grid restored per map (got ${JSON.stringify(remembered.restored)})`
   );
 
+  // stacked nodes are invisible on the canvas, so the File tab counts them
+  await page.evaluate(async () => {
+    const { store } = await import("/src/state/store.ts");
+    const { addWaypoint, connect } = await import("/src/model/graph.ts");
+    store.update((s) => {
+      const keep = addWaypoint(s.network, 0, 100, 0);
+      const dupe = addWaypoint(s.network, 0, 100, 0);
+      const east = addWaypoint(s.network, 20, 100, 0);
+      connect(s.network, dupe.id, east.id, "oneway");
+    });
+  });
+  await page.click(".tabs button:has-text('File')");
+  const merge = page.locator(".inspector button", { hasText: "stacked node" });
+  check((await merge.textContent()) === "Merge 1 stacked node", "stacked nodes counted");
+  await merge.click();
+  const merged = await page.evaluate(async () => {
+    const { store } = await import("/src/state/store.ts");
+    const [keep] = [...store.state.network.waypoints.values()];
+    return { nodes: store.state.network.waypoints.size, out: keep.out.length };
+  });
+  check(merged.nodes === 2, `stack merged away (got ${merged.nodes} nodes)`);
+  check(merged.out === 1, "the survivor kept the duplicate's connection");
+  check(
+    (await page.locator(".inspector button", { hasText: "No stacked nodes" }).count()) === 1,
+    "merge button reports nothing left to do"
+  );
+  await page.locator(".toast", { hasText: "Merged" }).getByRole("button", { name: "Undo" }).click();
+  const restored = await page.evaluate(async () => {
+    const { store } = await import("/src/state/store.ts");
+    return store.state.network.waypoints.size;
+  });
+  check(restored === 3, `undo brought the stack back (got ${restored} nodes)`);
+
   // shortcuts sheet opens from the strip and closes on Escape
   await page.click("button:has-text('Shortcuts')");
   check(await page.locator(".dialog").isVisible(), "shortcuts dialog opens");

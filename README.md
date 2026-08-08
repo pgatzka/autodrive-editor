@@ -23,6 +23,7 @@ the brief it was built from.
 - **Blueprint editor** — build or rework blueprints from scratch on their own canvas ("New blueprint" / "Edit" in the Blueprints tab): all normal tools work there (add, connect, grid route, flags, markers, undo), a crosshair marks the stamp anchor, and Save & close returns you to your map exactly as you left it.
 - **Flags** — toggle subprio (pathfinding cost ×20) and traffic-system flags per selection; subprio nodes render yellow.
 - **Markers & groups** — create, rename, and delete map markers and organize them into groups.
+- **Merge stacked nodes** — the File tab counts waypoints sitting on the exact same X/Z (a blueprint stamped twice, two routes joined, a node snapped onto another) and folds each stack into one node with a button. Connections, flags and markers of the whole stack move to the survivor, and it is undoable.
 - **Route tools** — insert midpoint on a connection, distribute a run of nodes evenly, generate a smooth curve between two nodes (tangents follow the adjoining roads).
 - **Savegame map background** — opening an `AutoDrive_config.xml` inside a savegame folder automatically renders the map's terrain under the network: a hillshaded elevation view decoded from the save's 16-bit `terrain.heightmap.png`, plus placeable and vehicle icons from the save. New nodes get their height (`y`) sampled from the real terrain. Opacity and icons are adjustable in the File tab; a folder can also be picked manually.
 
