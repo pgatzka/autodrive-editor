@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { store } from "../../state/store";
 import { useStore } from "../../state/useStore";
+import { Button, Section } from "../components/controls";
 
 /** Create, rename or remove the map marker attached to a single waypoint. */
 export function MarkerEditor({ wpId }: { wpId: number }) {
@@ -24,34 +25,38 @@ export function MarkerEditor({ wpId }: { wpId: number }) {
     });
   };
 
-  const remove = () => {
-    store.mutate((s) => {
-      s.network.markers = s.network.markers.filter((m) => m.wpId !== wpId);
-      s.statusMessage = "Marker removed";
-    });
-  };
-
   return (
-    <div>
-      <h4>Map marker</h4>
-      <div className="row">
-        <input placeholder="Marker name" value={name} onChange={(event) => setName(event.target.value)} />
-        <select value={group} onChange={(event) => setGroup(event.target.value)}>
+    <Section title="Marker">
+      <input
+        className="input"
+        placeholder="Marker name"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+      />
+      <div className="field-row">
+        <select className="input" value={group} onChange={(event) => setGroup(event.target.value)}>
           {state.network.groups.map((groupName) => (
             <option key={groupName}>{groupName}</option>
           ))}
         </select>
-      </div>
-      <div className="row">
-        <button disabled={!name.trim()} onClick={save}>
-          {marker ? "Update marker" : "Add marker"}
-        </button>
+        <Button disabled={!name.trim()} onClick={save}>
+          {marker ? "Update" : "Add"}
+        </Button>
         {marker && (
-          <button className="danger" onClick={remove}>
-            Remove
-          </button>
+          <Button
+            variant="danger"
+            title="Remove marker"
+            onClick={() =>
+              store.mutate((s) => {
+                s.network.markers = s.network.markers.filter((m) => m.wpId !== wpId);
+                s.statusMessage = "Marker removed";
+              })
+            }
+          >
+            ✕
+          </Button>
         )}
       </div>
-    </div>
+    </Section>
   );
 }

@@ -1,0 +1,308 @@
+/** Window shell: fixed chrome heights, the canvas takes everything left over. */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--surface-app);
+  color: var(--text-primary);
+  font: var(--text-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ---------- title bar (row 1: identity + file) ---------- */
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--h-titlebar);
+  flex: 0 0 var(--h-titlebar);
+  padding: 0 var(--space-3);
+  background: var(--surface-panel);
+  box-shadow: inset 0 -1px 0 var(--border-subtle);
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--text-title);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.wordmark .muted {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.path-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-xs);
+  padding: 0 var(--space-3);
+  margin: 0 auto;
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  box-shadow: var(--border-inset);
+  color: var(--text-secondary);
+  font: var(--text-mono);
+  max-width: 46%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.path-chip .unsaved {
+  color: var(--warning);
+  flex: none;
+}
+
+/* ---------- tool strip (row 2: everything touched while building) ---------- */
+
+.toolstrip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--h-toolstrip);
+  flex: 0 0 var(--h-toolstrip);
+  padding: 0 var(--space-3);
+  background: var(--surface-strip);
+  box-shadow: inset 0 -1px 0 var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.toolstrip::-webkit-scrollbar {
+  display: none;
+}
+
+.strip-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+.strip-group.push-right {
+  margin-left: auto;
+}
+
+.eyebrow {
+  font: var(--text-eyebrow);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* ---------- main area ---------- */
+
+.main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-canvas canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+/* blueprint workspace frames the viewport so the mode is unmissable */
+.editor-canvas.blueprint-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px var(--blueprint);
+}
+
+.canvas-banner {
+  position: absolute;
+  top: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--blueprint-wash);
+  box-shadow: inset 0 0 0 1px var(--blueprint);
+  color: var(--text-primary);
+  font: var(--text-eyebrow);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.canvas-hint {
+  position: absolute;
+  bottom: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-float), var(--border-inset);
+  white-space: nowrap;
+}
+
+.canvas-hint .name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.canvas-hint .value {
+  font: var(--text-mono);
+  color: var(--accent);
+}
+
+.zoom-controls {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--border-inset);
+  background: var(--border-subtle);
+}
+
+.zoom-controls button {
+  width: var(--control-md);
+  height: var(--control-md);
+  border: none;
+  border-radius: 0;
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.zoom-controls button:hover {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+/* ---------- status bar ---------- */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--h-statusbar);
+  flex: 0 0 var(--h-statusbar);
+  padding: 0 var(--space-3);
+  background: var(--surface-panel);
+  box-shadow: inset 0 1px 0 var(--border-subtle);
+  color: var(--text-secondary);
+  font: var(--text-mono);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.statusbar .message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusbar .readouts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-left: auto;
+  flex: none;
+}
+
+.statusbar .field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.statusbar .field .key {
+  color: var(--text-tertiary);
+}
+
+.statusbar .field .val {
+  color: var(--text-primary);
+}
+
+.snap-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.snap-state .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.snap-state.off .dot {
+  background: var(--warning);
+}
+
+@media (max-width: 1599px) {
+  .statusbar .cursor-readout {
+    display: none;
+  }
+}
+
+/* ---------- inspector ---------- */
+
+.inspector {
+  display: flex;
+  flex-direction: column;
+  width: var(--w-inspector);
+  flex: 0 0 var(--w-inspector);
+  background: var(--surface-panel);
+  box-shadow: inset 1px 0 0 var(--border-subtle);
+}
+
+.inspector-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.inspector-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.inspector-body::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 5px;
+  border: 3px solid var(--surface-panel);
+}

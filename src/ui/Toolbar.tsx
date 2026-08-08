@@ -1,70 +1,123 @@
-import { newConfig, openConfig, saveConfig } from "../files/fileio";
 import { ConnectionMode } from "../model/types";
-import { discardBlueprintEditor, saveBlueprintEditor } from "../state/blueprintSession";
+import { setShortcutsOpen } from "../state/feedback";
 import { store, Tool } from "../state/store";
 import { useStore } from "../state/useStore";
-import { NumberField, SegmentedButtons, SegmentedOption } from "./components/Field";
+import { Button, cx, Keycap, SegmentedOption, Segmented, Stepper } from "./components/controls";
 
-/** Tools in shortcut order — keys 1..4 select them. */
-export const TOOL_OPTIONS: readonly SegmentedOption<Tool>[] = [
-  { id: "select", label: "Select", hint: "1 — click/box select, drag to move" },
-  { id: "add", label: "Add nodes", hint: "2 — click to place, Ctrl+click chains" },
-  { id: "connect", label: "Connect", hint: "3 — click two nodes; again to cycle type" },
-  { id: "gridroute", label: "Grid route", hint: "4 — connect two nodes, node at every grid crossing" },
+/**
+ * Row 2 — everything touched while building. The active tool is the only
+ * accent-filled control in the shell, so "which mode am I in" is answered by
+ * colour mass in peripheral vision rather than by reading.
+ */
+
+interface ToolOption {
+  id: Tool;
+  label: string;
+  shortcut: string;
+  hint: string;
+}
+
+export const TOOL_OPTIONS: readonly ToolOption[] = [
+  { id: "select", label: "Select", shortcut: "1", hint: "Click, box-select, drag to move" },
+  { id: "add", label: "Add", shortcut: "2", hint: "Click to place · Ctrl+click chains" },
+  { id: "connect", label: "Connect", shortcut: "3", hint: "Click two waypoints · click again cycles type" },
+  {
+    id: "gridroute",
+    label: "Grid route",
+    shortcut: "4",
+    hint: "Node at every grid crossing between two waypoints",
+  },
 ] as const;
 
 const CONNECTION_OPTIONS: readonly SegmentedOption<ConnectionMode>[] = [
-  { id: "oneway", label: "One-way", hint: "A → B" },
-  { id: "dual", label: "Two-way", hint: "A ↔ B" },
-  { id: "reverse", label: "Reverse", hint: "A → B driving backwards" },
+  { id: "oneway", label: "One-way", hint: "A → B", sample: <span className="line-sample oneway" /> },
+  { id: "dual", label: "Two-way", hint: "A ↔ B", sample: <span className="line-sample dual" /> },
+  {
+    id: "reverse",
+    label: "Reverse",
+    hint: "A → B driving backwards",
+    sample: <span className="line-sample reverse" />,
+  },
 ] as const;
+
+const GRID_STEPS = [0.5, 1, 2, 2.5, 4, 5, 8, 10, 16, 20, 25, 32, 50];
 
 export function Toolbar() {
   const state = useStore();
+  const placing = state.placement !== null;
 
   return (
-    <div className="toolbar">
-      {state.blueprintEdit ? <BlueprintControls /> : <FileControls dirty={state.dirty} />}
-
-      <div className="tool-group">
-        <SegmentedButtons options={TOOL_OPTIONS} value={state.tool} onChange={selectTool} />
+    <div className="toolstrip">
+      <div className="strip-group" role="radiogroup" aria-label="Tool">
+        {TOOL_OPTIONS.map((tool) => (
+          <button
+            key={tool.id}
+            role="radio"
+            aria-checked={state.tool === tool.id}
+            title={`${tool.hint} (${tool.shortcut})`}
+            className={cx("btn", "tool-btn", state.tool === tool.id && "active")}
+            onClick={() => selectTool(tool.id)}
+          >
+            <span className="tool-label">{tool.label}</span>
+            <Keycap>{tool.shortcut}</Keycap>
+          </button>
+        ))}
+        {/* placement joins the group rather than replacing a tool, so the exclusive set stays intact */}
+        {placing && (
+          <span className="mode-chip">
+            Placing blueprint <Keycap>Esc</Keycap>
+          </span>
+        )}
       </div>
 
-      <div className="tool-group">
-        <span className="label">Connection:</span>
-        <SegmentedButtons
+      <div className="strip-group">
+        <span className="eyebrow">Draw</span>
+        <Segmented
+          ariaLabel="Connection type"
           options={CONNECTION_OPTIONS}
           value={state.settings.connectionMode}
           onChange={(mode) => store.update((s) => (s.settings.connectionMode = mode))}
         />
       </div>
 
-      <div className="tool-group">
-        <span className="label">Grid:</span>
-        <NumberField
+      <div className="strip-group">
+        <span className="eyebrow">Grid</span>
+        <Stepper
+          ariaLabel="grid size"
           value={state.settings.gridSize}
-          min={0.25}
-          step={0.25}
-          isValid={(value) => value > 0}
-          onChange={(value) => store.update((s) => (s.settings.gridSize = value))}
+          format={(value) => `${value} m`}
+          onStep={(direction) =>
+            store.update((s) => (s.settings.gridSize = stepGrid(s.settings.gridSize, direction)))
+          }
         />
-        <span className="label">m</span>
         <button
-          className={state.settings.snapEnabled ? "active" : ""}
-          title="G — snap nodes to the grid"
+          className={cx("snap-toggle", state.settings.snapEnabled && "on")}
+          title="Snap waypoints to the grid (G)"
+          aria-pressed={state.settings.snapEnabled}
           onClick={() => store.update((s) => (s.settings.snapEnabled = !s.settings.snapEnabled))}
         >
+          <span className="pip" />
           Snap
+          <Keycap>G</Keycap>
         </button>
       </div>
 
-      <div className="tool-group">
-        <button title="Ctrl+Z" onClick={() => store.undo()}>
+      {/* undo/redo and help sit far from the tools they would be confused with */}
+      <div className="strip-group push-right">
+        <Button variant="ghost" title="Undo (Ctrl+Z)" onClick={() => store.undo()}>
           Undo
-        </button>
-        <button title="Ctrl+Y" onClick={() => store.redo()}>
+        </Button>
+        <Button variant="ghost" title="Redo (Ctrl+Y)" onClick={() => store.redo()}>
           Redo
-        </button>
+        </Button>
+        <Button
+          variant="ghost"
+          shortcut="?"
+          title="Keyboard shortcuts"
+          onClick={() => setShortcutsOpen(true)}
+        >
+          Shortcuts
+        </Button>
       </div>
     </div>
   );
@@ -78,41 +131,9 @@ export function selectTool(tool: Tool): void {
   });
 }
 
-function FileControls({ dirty }: { dirty: boolean }) {
-  return (
-    <div className="tool-group">
-      <button onClick={() => newConfig()}>New</button>
-      <button onClick={() => void openConfig()}>Open…</button>
-      <button onClick={() => void saveConfig(false)}>Save{dirty ? " *" : ""}</button>
-      <button onClick={() => void saveConfig(true)}>Save As…</button>
-    </div>
-  );
-}
-
-function BlueprintControls() {
-  const state = useStore();
-  const session = state.blueprintEdit;
-  if (!session) return null;
-
-  return (
-    <div className="tool-group blueprint-banner">
-      <span className="label">Blueprint:</span>
-      <input
-        value={session.name}
-        style={{ width: 160 }}
-        onChange={(event) =>
-          store.update((s) => {
-            if (s.blueprintEdit) s.blueprintEdit = { ...s.blueprintEdit, name: event.target.value };
-          })
-        }
-      />
-      <button title="Ctrl+S" onClick={() => saveBlueprintEditor(false)}>
-        Save
-      </button>
-      <button onClick={() => saveBlueprintEditor(true)}>Save &amp; close</button>
-      <button className="danger" onClick={() => discardBlueprintEditor()}>
-        Discard
-      </button>
-    </div>
-  );
+/** Grid sizes players actually use, rather than free-form decimals. */
+export function stepGrid(current: number, direction: -1 | 1): number {
+  const index = GRID_STEPS.findIndex((step) => step >= current - 1e-9);
+  const next = index === -1 ? GRID_STEPS.length - 1 : index + direction;
+  return GRID_STEPS[Math.min(Math.max(next, 0), GRID_STEPS.length - 1)];
 }

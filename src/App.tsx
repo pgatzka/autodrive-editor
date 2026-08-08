@@ -3,7 +3,10 @@ import { EditorCanvas } from "./editor/EditorCanvas";
 import { useKeyboardShortcuts } from "./editor/useKeyboardShortcuts";
 import { loadBlueprintLibrary } from "./files/fileio";
 import { useStore } from "./state/useStore";
-import { Sidebar } from "./ui/Sidebar";
+import { Inspector } from "./ui/Inspector";
+import { Dialogs } from "./ui/overlays/Dialogs";
+import { StatusBar } from "./ui/StatusBar";
+import { TitleBar } from "./ui/TitleBar";
 import { Toolbar } from "./ui/Toolbar";
 
 export default function App() {
@@ -23,22 +26,16 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app">
+    // the blueprint workspace swaps the accent for every control at once
+    <div className={state.blueprintEdit ? "app blueprint-mode" : "app"}>
+      <TitleBar />
       <Toolbar />
       <div className="main">
         <EditorCanvas onCursorMove={onCursorMove} />
-        <Sidebar />
+        <Inspector />
       </div>
-      <div className="statusbar">
-        {state.blueprintEdit && <span className="mode-chip">BLUEPRINT</span>}
-        <span>{state.statusMessage}</span>
-        <span className="spacer" />
-        <span>
-          x {cursor.x.toFixed(1)} z {cursor.z.toFixed(1)} · zoom {state.view.scale.toFixed(2)}px/m ·{" "}
-          {state.network.waypoints.size} nodes
-          {state.settings.snapEnabled ? ` · snap ${state.settings.gridSize}m` : " · snap off"}
-        </span>
-      </div>
+      <StatusBar cursor={cursor} />
+      <Dialogs />
     </div>
   );
 }

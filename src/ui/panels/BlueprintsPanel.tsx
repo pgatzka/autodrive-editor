@@ -3,8 +3,10 @@ import { exportBlueprintFile, importBlueprintFiles, persistBlueprintLibrary } fr
 import { captureBlueprint } from "../../model/blueprint";
 import { Blueprint } from "../../model/types";
 import { enterBlueprintEditor } from "../../state/blueprintSession";
+import { showToast } from "../../state/feedback";
 import { store } from "../../state/store";
 import { useStore } from "../../state/useStore";
+import { Button, EmptyState, Section } from "../components/controls";
 
 export function BlueprintsPanel() {
   const state = useStore();
@@ -23,52 +25,61 @@ export function BlueprintsPanel() {
   };
 
   return (
-    <div>
-      <h3>Blueprints</h3>
+    <>
       {editing ? (
         <p className="hint">
-          Blueprint editor is open — use the map tools to build it, then Save &amp; close in the toolbar.
+          The blueprint workspace is open — build it with the map tools, then Save &amp; close above.
         </p>
       ) : (
-        <div className="row">
-          <button
-            title="Open an empty blueprint canvas and build one from scratch with the normal tools"
+        <div className="field-row">
+          <Button
+            variant="primary"
+            wide
+            title="Open an empty blueprint canvas and build one from scratch"
             onClick={() => enterBlueprintEditor(null)}
           >
             New blueprint
-          </button>
-          <button onClick={() => void importBlueprintFiles()}>Import…</button>
+          </Button>
+          <Button onClick={() => void importBlueprintFiles()}>Import…</Button>
         </div>
       )}
 
-      <div className="row">
-        <input
-          placeholder="Name for captured selection"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-        <button
-          disabled={state.selection.size === 0 || !name.trim()}
-          title="Save the selected nodes and their connections as a reusable blueprint"
-          onClick={captureSelection}
-        >
-          Capture
-        </button>
-      </div>
+      <Section title="Capture selection">
+        <div className="field-row">
+          <input
+            className="input"
+            placeholder="Name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+          <Button
+            disabled={state.selection.size === 0 || !name.trim()}
+            title="Save the selected waypoints and their connections as a blueprint"
+            onClick={captureSelection}
+          >
+            Capture
+          </Button>
+        </div>
+      </Section>
 
-      {state.blueprints.length === 0 && (
-        <p className="hint">No blueprints yet. Build one with "New blueprint" or capture a selection.</p>
+      {state.blueprints.length === 0 ? (
+        <EmptyState title="No blueprints yet">
+          Build one from scratch, or select waypoints on the map and capture them.
+        </EmptyState>
+      ) : (
+        <Section title={`Library · ${state.blueprints.length}`}>
+          {state.blueprints.map((blueprint, index) => (
+            <BlueprintRow
+              key={index}
+              blueprint={blueprint}
+              index={index}
+              editable={!editing}
+              locked={editing?.index === index}
+            />
+          ))}
+        </Section>
       )}
-      {state.blueprints.map((blueprint, index) => (
-        <BlueprintRow
-          key={index}
-          blueprint={blueprint}
-          index={index}
-          editable={!editing}
-          locked={editing?.index === index}
-        />
-      ))}
-    </div>
+    </>
   );
 }
 
@@ -87,7 +98,7 @@ function BlueprintRow({
     store.update((s) => {
       s.placement = { blueprint, rotation: 0 };
       s.tool = "place";
-      s.statusMessage = `Placing "${blueprint.name}" — click to stamp, R rotates, Esc cancels`;
+      s.statusMessage = `Click to stamp ${blueprint.name} · R rotates`;
     });
 
   const remove = () => {
@@ -98,33 +109,37 @@ function BlueprintRow({
       }
     });
     void persistBlueprintLibrary();
+    showToast("info", `Removed "${blueprint.name}"`);
   };
 
   return (
-    <div className="row marker-row">
-      <span>
-        {blueprint.name} <span className="hint">({blueprint.nodes.length} nodes)</span>
+    <div className="list-row">
+      <span className="grow">
+        {blueprint.name}
+        <br />
+        <span className="sub">
+          {blueprint.nodes.length} nodes · {blueprint.edges.length} links
+        </span>
       </span>
-      <span>
-        <button
-          title="Move the mouse over the map, R rotates, click to stamp, Esc to finish"
-          onClick={startPlacing}
+      <Button small title="Move the mouse over the map, R rotates, click to stamp" onClick={startPlacing}>
+        Place
+      </Button>
+      {editable && (
+        <Button
+          small
+          variant="ghost"
+          title="Edit in the blueprint workspace"
+          onClick={() => enterBlueprintEditor(index)}
         >
-          Place
-        </button>
-        {editable && (
-          <button
-            title="Open this blueprint in the blueprint editor"
-            onClick={() => enterBlueprintEditor(index)}
-          >
-            Edit
-          </button>
-        )}
-        <button onClick={() => void exportBlueprintFile(blueprint)}>Export</button>
-        <button className="danger" disabled={locked} onClick={remove}>
-          ✕
-        </button>
-      </span>
+          Edit
+        </Button>
+      )}
+      <Button small variant="ghost" onClick={() => void exportBlueprintFile(blueprint)}>
+        Export
+      </Button>
+      <Button small variant="ghost" disabled={locked} title="Remove blueprint" onClick={remove}>
+        ✕
+      </Button>
     </div>
   );
 }

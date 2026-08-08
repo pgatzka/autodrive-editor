@@ -1,16 +1,27 @@
 import { SavegameBackground } from "../model/background";
-import { Blueprint } from "../model/types";
-import { placedPositions } from "../model/blueprint";
 import { allEdges } from "../model/graph";
-import { FLAG_SUBPRIO, RouteNetwork } from "../model/types";
+import { ConnectionMode, FLAG_SUBPRIO, RouteNetwork } from "../model/types";
 import { EditorState } from "../state/store";
-import { CANVAS_COLORS, CANVAS_FONT, CONNECTION_COLORS, edgeWidth, MARKER_FONT, nodeRadius } from "./theme";
+import { fillCircle, ScreenPoint, strokeCircle, strokeLine } from "./canvasPrimitives";
+import { drawAnchor, drawGhost, drawMarkers, drawRubberBand, drawWorldIcons } from "./renderAnnotations";
+import {
+  CANVAS_COLORS,
+  casingWidth,
+  chevronSpacing,
+  CONNECTION_COLORS,
+  linkWidth,
+  MAJOR_GRID_EVERY,
+  MIN_GRID_SPACING_PX,
+  nodeRadius,
+  ZOOM,
+} from "./theme";
 import { Viewport } from "./viewport";
 
 /**
- * Canvas drawing. Every function takes the context and a viewport and draws
- * one layer; `renderScene` composes them in paint order. Keeping the layers
- * separate means each one can change without touching the others.
+ * The network layers, composed by `renderScene` in paint order. Implements
+ * "Grammar B — cased": every link sits on a dark casing so it reads over any
+ * terrain, and states differ in shape (ring / square / filled, chevrons /
+ * plain / double dash) so colour is never the only channel.
  */
 
 export interface MarqueeRect {
@@ -26,34 +37,49 @@ export interface SceneOverlays {
   marquee: MarqueeRect | null;
 }
 
+interface LinkStyle {
+  kind: ConnectionMode;
+  width: number;
+  scale: number;
+  condemned: boolean;
+}
+
+interface NodeState {
+  selected: boolean;
+  condemned: boolean;
+  subprio: boolean;
+  pending: boolean;
+}
+
 export function renderScene(
   ctx: CanvasRenderingContext2D,
   state: EditorState,
   viewport: Viewport,
   overlays: SceneOverlays
 ): void {
-  const inBlueprintMode = state.blueprintEdit !== null;
+  const blueprintMode = state.blueprintEdit !== null;
 
-  drawBackdrop(ctx, viewport, inBlueprintMode);
-  if (state.background && !inBlueprintMode) {
+  drawField(ctx, viewport, blueprintMode);
+  if (state.background && !blueprintMode) {
     drawTerrain(ctx, viewport, state.background, state.settings.backgroundOpacity);
   }
-  drawGrid(ctx, viewport, state.settings.gridSize);
-  drawEdges(ctx, viewport, state.network);
-  drawPendingConnection(ctx, viewport, state, overlays.cursor);
-  if (state.background && !inBlueprintMode && state.settings.showIcons) {
+  drawGrid(ctx, viewport, state.settings.gridSize, blueprintMode);
+  if (state.background && !blueprintMode && state.settings.showIcons) {
     drawWorldIcons(ctx, viewport, state.background);
   }
-  if (inBlueprintMode) drawBlueprintAnchor(ctx, viewport, state.network);
+  drawLinks(ctx, viewport, state);
+  drawPendingConnection(ctx, viewport, state, overlays.cursor);
+  if (blueprintMode) drawAnchor(ctx, viewport, state.network);
   drawNodes(ctx, viewport, state);
+  drawMarkers(ctx, viewport, state.network);
   if (state.placement && overlays.cursor) {
-    drawBlueprintGhost(ctx, viewport, state.placement.blueprint, state.placement.rotation, overlays.cursor);
+    drawGhost(ctx, viewport, state.placement.blueprint, state.placement.rotation, overlays.cursor);
   }
-  if (overlays.marquee) drawMarquee(ctx, overlays.marquee);
+  if (overlays.marquee) drawRubberBand(ctx, overlays.marquee);
 }
 
-function drawBackdrop(ctx: CanvasRenderingContext2D, viewport: Viewport, blueprintMode: boolean): void {
-  ctx.fillStyle = blueprintMode ? CANVAS_COLORS.backgroundBlueprint : CANVAS_COLORS.background;
+function drawField(ctx: CanvasRenderingContext2D, viewport: Viewport, blueprintMode: boolean): void {
+  ctx.fillStyle = blueprintMode ? CANVAS_COLORS.fieldBlueprint : CANVAS_COLORS.field;
   ctx.fillRect(0, 0, viewport.width, viewport.height);
 }
 
@@ -65,8 +91,7 @@ function drawTerrain(
 ): void {
   const half = background.sizeMeters / 2;
   ctx.globalAlpha = opacity;
-  // crisp texels when zoomed in, smoothed when the map is minified
-  ctx.imageSmoothingEnabled = viewport.scale < 1;
+  ctx.imageSmoothingEnabled = true;
   ctx.drawImage(
     background.canvas,
     viewport.toScreenX(-half),
@@ -74,31 +99,35 @@ function drawTerrain(
     background.sizeMeters * viewport.scale,
     background.sizeMeters * viewport.scale
   );
-  ctx.imageSmoothingEnabled = true;
   ctx.globalAlpha = 1;
 }
 
-/** Grid lines are skipped when they would be denser than this many pixels. */
-const MIN_GRID_SPACING_PX = 6;
-const MAJOR_GRID_EVERY = 10;
+function drawGrid(
+  ctx: CanvasRenderingContext2D,
+  viewport: Viewport,
+  gridSize: number,
+  blueprintMode: boolean
+): void {
+  if (gridSize <= 0) return;
+  const minorVisible = gridSize * viewport.scale >= MIN_GRID_SPACING_PX;
+  const majorVisible = gridSize * viewport.scale * MAJOR_GRID_EVERY >= MIN_GRID_SPACING_PX;
+  if (!majorVisible) return;
 
-function drawGrid(ctx: CanvasRenderingContext2D, viewport: Viewport, gridSize: number): void {
-  if (gridSize <= 0 || gridSize * viewport.scale < MIN_GRID_SPACING_PX) return;
-
-  const minX = viewport.toWorldX(0);
-  const maxX = viewport.toWorldX(viewport.width);
-  const minZ = viewport.toWorldZ(0);
-  const maxZ = viewport.toWorldZ(viewport.height);
+  const minor = blueprintMode ? CANVAS_COLORS.gridMinorBlueprint : CANVAS_COLORS.gridMinor;
+  const major = blueprintMode ? CANVAS_COLORS.gridMajorBlueprint : CANVAS_COLORS.gridMajor;
+  const step = minorVisible ? gridSize : gridSize * MAJOR_GRID_EVERY;
   ctx.lineWidth = 1;
 
-  for (let x = Math.floor(minX / gridSize) * gridSize; x <= maxX; x += gridSize) {
-    ctx.strokeStyle = isMajor(x, gridSize) ? CANVAS_COLORS.gridMajor : CANVAS_COLORS.gridMinor;
-    const sx = viewport.toScreenX(x);
+  const firstX = Math.floor(viewport.toWorldX(0) / step) * step;
+  for (let x = firstX; x <= viewport.toWorldX(viewport.width); x += step) {
+    ctx.strokeStyle = isMajor(x, gridSize) ? major : minor;
+    const sx = Math.round(viewport.toScreenX(x)) + 0.5;
     strokeLine(ctx, sx, 0, sx, viewport.height);
   }
-  for (let z = Math.floor(minZ / gridSize) * gridSize; z <= maxZ; z += gridSize) {
-    ctx.strokeStyle = isMajor(z, gridSize) ? CANVAS_COLORS.gridMajor : CANVAS_COLORS.gridMinor;
-    const sy = viewport.toScreenY(z);
+  const firstZ = Math.floor(viewport.toWorldZ(0) / step) * step;
+  for (let z = firstZ; z <= viewport.toWorldZ(viewport.height); z += step) {
+    ctx.strokeStyle = isMajor(z, gridSize) ? major : minor;
+    const sy = Math.round(viewport.toScreenY(z)) + 0.5;
     strokeLine(ctx, 0, sy, viewport.width, sy);
   }
 }
@@ -107,28 +136,105 @@ function isMajor(coordinate: number, gridSize: number): boolean {
   return Math.round(coordinate / gridSize) % MAJOR_GRID_EVERY === 0;
 }
 
-/** Arrow heads are only legible above this zoom. */
-const MIN_ARROW_SCALE = 1.2;
+// ---------- links ----------
 
-function drawEdges(ctx: CanvasRenderingContext2D, viewport: Viewport, network: RouteNetwork): void {
-  ctx.lineWidth = edgeWidth(viewport.scale);
-  const withArrows = viewport.scale > MIN_ARROW_SCALE;
+function drawLinks(ctx: CanvasRenderingContext2D, viewport: Viewport, state: EditorState): void {
+  const edges = allEdges(state.network);
+  const width = linkWidth(viewport.scale);
+  const doomed = state.pendingDeletion;
 
-  for (const edge of allEdges(network)) {
-    const from = network.waypoints.get(edge.from)!;
-    const to = network.waypoints.get(edge.to)!;
-    const ax = viewport.toScreenX(from.x);
-    const ay = viewport.toScreenY(from.z);
-    const bx = viewport.toScreenX(to.x);
-    const by = viewport.toScreenY(to.z);
-    if (!viewport.isVisible(ax, ay) && !viewport.isVisible(bx, by)) continue;
-
-    ctx.strokeStyle = CONNECTION_COLORS[edge.kind];
-    ctx.setLineDash(edge.kind === "reverse" ? [6, 4] : []);
-    strokeLine(ctx, ax, ay, bx, by);
-    ctx.setLineDash([]);
-    if (withArrows && edge.kind !== "dual") drawArrowHead(ctx, ax, ay, bx, by);
+  // casing pass first, so neighbouring links never cut into each other
+  ctx.strokeStyle = CANVAS_COLORS.linkCasing;
+  ctx.lineWidth = casingWidth(viewport.scale);
+  ctx.lineCap = "round";
+  for (const edge of edges) {
+    const segment = screenSegment(viewport, state.network, edge.from, edge.to);
+    if (segment) strokeLine(ctx, segment.a.x, segment.a.y, segment.b.x, segment.b.y);
   }
+  ctx.lineCap = "butt";
+
+  for (const edge of edges) {
+    const segment = screenSegment(viewport, state.network, edge.from, edge.to);
+    if (!segment) continue;
+    const condemned = doomed !== null && doomed.has(edge.from) && doomed.has(edge.to);
+    drawLink(ctx, segment.a, segment.b, { kind: edge.kind, width, scale: viewport.scale, condemned });
+  }
+}
+
+interface LinkStyle {
+  kind: ConnectionMode;
+  width: number;
+  scale: number;
+  condemned: boolean;
+}
+
+function drawLink(ctx: CanvasRenderingContext2D, a: ScreenPoint, b: ScreenPoint, style: LinkStyle): void {
+  const { kind, width, scale, condemned } = style;
+  ctx.strokeStyle = condemned ? CANVAS_COLORS.danger : CONNECTION_COLORS[kind];
+
+  if (kind === "reverse") {
+    drawReverseRails(ctx, a, b, width, scale);
+    return;
+  }
+  ctx.lineWidth = kind === "dual" ? width * 1.15 : width;
+  strokeLine(ctx, a.x, a.y, b.x, b.y);
+  if (kind === "oneway" && scale > ZOOM.chevrons) {
+    drawChevrons(ctx, a, b, width, scale);
+  }
+}
+
+/** Reverse links are a double dashed rail, collapsing to one when zoomed out. */
+function drawReverseRails(
+  ctx: CanvasRenderingContext2D,
+  a: ScreenPoint,
+  b: ScreenPoint,
+  width: number,
+  scale: number
+): void {
+  const dash = 1.6 * width;
+  ctx.lineWidth = width;
+  ctx.setLineDash([dash, dash]);
+  if (scale < ZOOM.reverseDoubleRail) {
+    strokeLine(ctx, a.x, a.y, b.x, b.y);
+  } else {
+    const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const nx = (-(b.y - a.y) / length) * (width * 0.75);
+    const ny = ((b.x - a.x) / length) * (width * 0.75);
+    strokeLine(ctx, a.x + nx, a.y + ny, b.x + nx, b.y + ny);
+    strokeLine(ctx, a.x - nx, a.y - ny, b.x - nx, b.y - ny);
+  }
+  ctx.setLineDash([]);
+}
+
+/** Direction is carried by repeated chevrons, not a single midpoint arrow. */
+function drawChevrons(
+  ctx: CanvasRenderingContext2D,
+  a: ScreenPoint,
+  b: ScreenPoint,
+  width: number,
+  scale: number
+): void {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  const spacing = chevronSpacing(scale);
+  if (length < spacing) return;
+
+  const ux = dx / length;
+  const uy = dy / length;
+  const size = Math.max(3.5, width * 2);
+  ctx.lineWidth = Math.max(1, width * 0.9);
+  ctx.lineCap = "round";
+  for (let distance = spacing / 2; distance < length; distance += spacing) {
+    const x = a.x + ux * distance;
+    const y = a.y + uy * distance;
+    ctx.beginPath();
+    ctx.moveTo(x - ux * size - uy * size * 0.6, y - uy * size + ux * size * 0.6);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x - ux * size + uy * size * 0.6, y - uy * size - ux * size * 0.6);
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
 }
 
 function drawPendingConnection(
@@ -141,7 +247,8 @@ function drawPendingConnection(
   const from = state.network.waypoints.get(state.pendingConnectFrom);
   if (!from) return;
 
-  ctx.strokeStyle = CANVAS_COLORS.ghost;
+  ctx.strokeStyle = CANVAS_COLORS.pending;
+  ctx.lineWidth = 1.5;
   ctx.setLineDash([5, 5]);
   strokeLine(
     ctx,
@@ -153,199 +260,89 @@ function drawPendingConnection(
   ctx.setLineDash([]);
 }
 
-/** Icon labels are only drawn above this zoom. */
-const MIN_LABEL_SCALE = 1.5;
+// ---------- nodes ----------
 
-function drawWorldIcons(
-  ctx: CanvasRenderingContext2D,
-  viewport: Viewport,
-  background: SavegameBackground
-): void {
-  ctx.font = CANVAS_FONT;
-  ctx.textAlign = "center";
-
-  for (const icon of background.placeables) {
-    const sx = viewport.toScreenX(icon.x);
-    const sy = viewport.toScreenY(icon.z);
-    if (!viewport.isVisible(sx, sy)) continue;
-    ctx.fillStyle = CANVAS_COLORS.placeable;
-    ctx.fillRect(sx - 4, sy - 4, 8, 8);
-    if (viewport.scale > MIN_LABEL_SCALE && icon.label) ctx.fillText(icon.label, sx, sy - 8);
-  }
-
-  for (const icon of background.vehicles) {
-    const sx = viewport.toScreenX(icon.x);
-    const sy = viewport.toScreenY(icon.z);
-    if (!viewport.isVisible(sx, sy)) continue;
-    ctx.fillStyle = CANVAS_COLORS.vehicle;
-    fillTriangle(ctx, { x: sx, y: sy - 5 }, { x: sx + 5, y: sy + 4 }, { x: sx - 5, y: sy + 4 });
-    if (viewport.scale > MIN_LABEL_SCALE && icon.label) ctx.fillText(icon.label, sx, sy - 8);
-  }
+interface NodeState {
+  selected: boolean;
+  condemned: boolean;
+  subprio: boolean;
+  pending: boolean;
 }
 
 function drawNodes(ctx: CanvasRenderingContext2D, viewport: Viewport, state: EditorState): void {
   const radius = nodeRadius(viewport.scale);
-  const markerByWaypoint = new Map(state.network.markers.map((marker) => [marker.wpId, marker]));
+  const ringLegible = radius >= 2.6 && viewport.scale >= ZOOM.ringLegible;
 
-  for (const wp of state.network.waypoints.values()) {
-    const sx = viewport.toScreenX(wp.x);
-    const sy = viewport.toScreenY(wp.z);
-    if (!viewport.isVisible(sx, sy)) continue;
+  for (const waypoint of state.network.waypoints.values()) {
+    const at = { x: viewport.toScreenX(waypoint.x), y: viewport.toScreenY(waypoint.z) };
+    if (!viewport.isVisible(at.x, at.y)) continue;
 
-    ctx.fillStyle = (wp.flags & FLAG_SUBPRIO) !== 0 ? CANVAS_COLORS.nodeSubprio : CANVAS_COLORS.node;
-    fillCircle(ctx, sx, sy, radius);
-
-    if (state.selection.has(wp.id)) {
-      ctx.strokeStyle = CANVAS_COLORS.nodeSelected;
-      ctx.lineWidth = 2;
-      strokeCircle(ctx, sx, sy, radius);
-    }
-    if (wp.id === state.pendingConnectFrom) {
-      ctx.strokeStyle = CANVAS_COLORS.ghost;
-      ctx.lineWidth = 2;
-      strokeCircle(ctx, sx, sy, radius + 3);
-    }
-
-    const marker = markerByWaypoint.get(wp.id);
-    if (marker) drawMarker(ctx, viewport, { x: sx, y: sy }, radius, marker.name);
+    drawNode(ctx, at, radius, ringLegible, {
+      selected: state.selection.has(waypoint.id),
+      condemned: state.pendingDeletion?.has(waypoint.id) ?? false,
+      subprio: (waypoint.flags & FLAG_SUBPRIO) !== 0,
+      pending: waypoint.id === state.pendingConnectFrom,
+    });
   }
 }
 
-/** Marker labels are only drawn above this zoom. */
-const MIN_MARKER_LABEL_SCALE = 0.8;
-
-function drawMarker(
+function drawNode(
   ctx: CanvasRenderingContext2D,
-  viewport: Viewport,
-  anchor: ScreenPoint,
+  at: ScreenPoint,
   radius: number,
-  name: string
+  ringLegible: boolean,
+  node: NodeState
 ): void {
-  const { x: sx, y: sy } = anchor;
-  ctx.fillStyle = CANVAS_COLORS.marker;
-  fillTriangle(
-    ctx,
-    { x: sx, y: sy - radius - 10 },
-    { x: sx + 6, y: sy - radius - 3 },
-    { x: sx - 6, y: sy - radius - 3 }
-  );
-  if (viewport.scale > MIN_MARKER_LABEL_SCALE) {
-    ctx.font = MARKER_FONT;
-    ctx.textAlign = "center";
-    ctx.fillText(name, sx, sy - radius - 14);
-  }
-}
+  ctx.fillStyle = nodeFill(node);
 
-function drawBlueprintGhost(
-  ctx: CanvasRenderingContext2D,
-  viewport: Viewport,
-  blueprint: Blueprint,
-  rotation: number,
-  cursor: { x: number; z: number }
-): void {
-  const positions = placedPositions(blueprint, { x: cursor.x, z: cursor.z, rotation });
-  ctx.strokeStyle = CANVAS_COLORS.ghost;
-  ctx.lineWidth = 1.5;
-  for (const edge of blueprint.edges) {
-    strokeLine(
-      ctx,
-      viewport.toScreenX(positions[edge.from].x),
-      viewport.toScreenY(positions[edge.from].z),
-      viewport.toScreenX(positions[edge.to].x),
-      viewport.toScreenY(positions[edge.to].z)
-    );
-  }
-  ctx.fillStyle = CANVAS_COLORS.ghost;
-  const radius = Math.max(nodeRadius(viewport.scale) - 1, 2);
-  for (const position of positions) {
-    fillCircle(ctx, viewport.toScreenX(position.x), viewport.toScreenY(position.z), radius);
-  }
-}
-
-/** Crosshair marking the point a blueprint is stamped by (its node centroid). */
-function drawBlueprintAnchor(ctx: CanvasRenderingContext2D, viewport: Viewport, network: RouteNetwork): void {
-  let x = 0;
-  let z = 0;
-  if (network.waypoints.size > 0) {
-    for (const wp of network.waypoints.values()) {
-      x += wp.x;
-      z += wp.z;
+  // shape carries the meaning: subprio is a square, everything else a disc
+  if (node.subprio) {
+    const side = radius * 1.8;
+    ctx.fillRect(at.x - side / 2, at.y - side / 2, side, side);
+  } else {
+    fillCircle(ctx, at.x, at.y, radius);
+    if (ringLegible && !node.selected && !node.condemned) {
+      // a ring rather than a disc, so overlapping nodes stay countable
+      ctx.fillStyle = CANVAS_COLORS.nodeCore;
+      fillCircle(ctx, at.x, at.y, radius * 0.5);
     }
-    x /= network.waypoints.size;
-    z /= network.waypoints.size;
   }
-  const sx = viewport.toScreenX(x);
-  const sy = viewport.toScreenY(z);
 
-  ctx.strokeStyle = CANVAS_COLORS.anchor;
-  ctx.lineWidth = 1;
-  strokeLine(ctx, sx - 14, sy, sx + 14, sy);
-  strokeLine(ctx, sx, sy - 14, sx, sy + 14);
-  strokeCircle(ctx, sx, sy, 8);
-  ctx.fillStyle = CANVAS_COLORS.anchor;
-  ctx.font = CANVAS_FONT;
-  ctx.textAlign = "left";
-  ctx.fillText("anchor", sx + 12, sy - 8);
+  if (node.selected || node.condemned) {
+    ctx.strokeStyle = node.condemned ? CANVAS_COLORS.danger : CANVAS_COLORS.nodeSelected;
+    ctx.lineWidth = 1.5;
+    strokeCircle(ctx, at.x, at.y, radius + 3.5);
+  }
+  if (node.pending) {
+    ctx.strokeStyle = CANVAS_COLORS.pending;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    strokeCircle(ctx, at.x, at.y, Math.max(radius + 7, 9));
+    ctx.setLineDash([]);
+  }
 }
 
-function drawMarquee(ctx: CanvasRenderingContext2D, rect: MarqueeRect): void {
-  const x = Math.min(rect.x0, rect.x1);
-  const y = Math.min(rect.y0, rect.y1);
-  const width = Math.abs(rect.x1 - rect.x0);
-  const height = Math.abs(rect.y1 - rect.y0);
-  ctx.fillStyle = CANVAS_COLORS.marquee;
-  ctx.fillRect(x, y, width, height);
-  ctx.strokeStyle = CANVAS_COLORS.marqueeBorder;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x, y, width, height);
+function nodeFill(node: NodeState): string {
+  if (node.condemned) return CANVAS_COLORS.danger;
+  if (node.selected) return CANVAS_COLORS.nodeSelected;
+  return node.subprio ? CANVAS_COLORS.nodeSubprio : CANVAS_COLORS.node;
 }
 
-// ---------- primitives ----------
+// ---------- savegame world icons ----------
 
-function strokeLine(ctx: CanvasRenderingContext2D, ax: number, ay: number, bx: number, by: number): void {
-  ctx.beginPath();
-  ctx.moveTo(ax, ay);
-  ctx.lineTo(bx, by);
-  ctx.stroke();
-}
+// ---------- overlays ----------
 
-function fillCircle(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function strokeCircle(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.stroke();
-}
-
-interface ScreenPoint {
-  x: number;
-  y: number;
-}
-
-function fillTriangle(ctx: CanvasRenderingContext2D, a: ScreenPoint, b: ScreenPoint, c: ScreenPoint): void {
-  ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
-  ctx.lineTo(b.x, b.y);
-  ctx.lineTo(c.x, c.y);
-  ctx.closePath();
-  ctx.fill();
-}
-
-/** Arrow head at 60% along the edge, showing travel direction. */
-function drawArrowHead(ctx: CanvasRenderingContext2D, ax: number, ay: number, bx: number, by: number): void {
-  const x = ax + (bx - ax) * 0.6;
-  const y = ay + (by - ay) * 0.6;
-  const angle = Math.atan2(by - ay, bx - ax);
-  const size = 7;
-  const spread = 0.45;
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x - size * Math.cos(angle - spread), y - size * Math.sin(angle - spread));
-  ctx.moveTo(x, y);
-  ctx.lineTo(x - size * Math.cos(angle + spread), y - size * Math.sin(angle + spread));
-  ctx.stroke();
+function screenSegment(
+  viewport: Viewport,
+  network: RouteNetwork,
+  fromId: number,
+  toId: number
+): { a: ScreenPoint; b: ScreenPoint } | null {
+  const from = network.waypoints.get(fromId);
+  const to = network.waypoints.get(toId);
+  if (!from || !to) return null;
+  const a = { x: viewport.toScreenX(from.x), y: viewport.toScreenY(from.z) };
+  const b = { x: viewport.toScreenX(to.x), y: viewport.toScreenY(to.z) };
+  if (!viewport.isVisible(a.x, a.y) && !viewport.isVisible(b.x, b.y)) return null;
+  return { a, b };
 }

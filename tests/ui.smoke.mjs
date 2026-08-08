@@ -39,11 +39,11 @@ page.on("pageerror", (error) => pageErrors.push(error.message));
 
 try {
   await page.goto(server.resolvedUrls.local[0]);
-  await page.waitForSelector(".toolbar");
+  await page.waitForSelector(".toolstrip");
   check((await page.locator("canvas").count()) === 1, "canvas mounts");
 
   // place two nodes with the Add tool and connect them by dragging the grid route
-  await page.click("button:has-text('Add nodes')");
+  await page.click(".tool-btn:has-text('Add')");
   const canvas = page.locator("canvas");
   await canvas.click({ position: { x: 400, y: 300 } });
   await canvas.click({ position: { x: 500, y: 300 }, modifiers: ["Control"] });
@@ -58,7 +58,7 @@ try {
   check(afterAdd.edges === 1, `ctrl+click chained them (got ${afterAdd.edges})`);
 
   // box select both with the Select tool, then delete via the keyboard
-  await page.click("button:has-text('Select')");
+  await page.click(".tool-btn:has-text('Select')");
   await page.mouse.move(300, 200);
   await page.mouse.down();
   await page.mouse.move(600, 400, { steps: 5 });
@@ -74,20 +74,28 @@ try {
     const { store } = await import("/src/state/store.ts");
     return store.state.network.waypoints.size;
   });
-  check(afterDelete === 0, "delete key removed the selection");
+  check(afterDelete === 0, "delete key removed the small selection without asking");
 
-  // sidebar tabs render
+  // inspector tabs render
   for (const tab of ["Markers", "Blueprints", "File"]) {
     await page.click(`.tabs button:has-text('${tab}')`);
-    check((await page.locator(".panel h3").count()) > 0, `${tab} panel renders`);
+    check((await page.locator(".inspector-body").count()) === 1, `${tab} panel renders`);
   }
 
-  // blueprint workspace opens and closes without disturbing the map
+  // blueprint workspace opens, is unmistakable, and closes without touching the map
   await page.click(".tabs button:has-text('Blueprints')");
   await page.click("button:has-text('New blueprint')");
-  check(await page.locator(".blueprint-banner").isVisible(), "blueprint workspace opens");
+  check(await page.locator(".canvas-banner").isVisible(), "blueprint banner shown");
+  check(await page.locator(".editor-canvas.blueprint-frame").isVisible(), "blueprint frame shown");
+  check((await page.locator(".app.blueprint-mode").count()) === 1, "blueprint accent applied");
   await page.click("button:has-text('Discard')");
-  check((await page.locator(".blueprint-banner").count()) === 0, "blueprint workspace closes");
+  check((await page.locator(".canvas-banner").count()) === 0, "blueprint workspace closes");
+
+  // shortcuts sheet opens from the strip and closes on Escape
+  await page.click("button:has-text('Shortcuts')");
+  check(await page.locator(".dialog").isVisible(), "shortcuts dialog opens");
+  await page.keyboard.press("Escape");
+  check((await page.locator(".dialog").count()) === 0, "shortcuts dialog closes");
 
   check(pageErrors.length === 0, `no page errors (${pageErrors.join("; ")})`);
 } finally {

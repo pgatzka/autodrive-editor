@@ -3,6 +3,7 @@ import { MapMarker } from "../../model/types";
 import { focusOnWaypoint } from "../../state/actions";
 import { store } from "../../state/store";
 import { useStore } from "../../state/useStore";
+import { Button, EmptyState, Section } from "../components/controls";
 
 export function MarkersPanel() {
   const state = useStore();
@@ -17,52 +18,54 @@ export function MarkersPanel() {
   };
 
   return (
-    <div>
-      <h3>Markers &amp; groups</h3>
-      <div className="row">
-        <input
-          placeholder="New group name"
-          value={newGroup}
-          onChange={(event) => setNewGroup(event.target.value)}
-        />
-        <button
-          disabled={!newGroup.trim() || state.network.groups.includes(newGroup.trim())}
-          onClick={addGroup}
-        >
-          Add group
-        </button>
-      </div>
-
-      {Array.from(grouped.entries()).map(([group, markers]) => (
-        <div key={group} className="group-block">
-          <h4>
-            {group} <span className="hint">({markers.length})</span>
-            {group !== "All" && markers.length === 0 && (
-              <button
-                className="danger small"
-                onClick={() =>
-                  store.mutate((s) => (s.network.groups = s.network.groups.filter((g) => g !== group)))
-                }
-              >
-                remove
-              </button>
-            )}
-          </h4>
-          {markers.map((marker) => (
-            <div key={marker.wpId} className="row marker-row">
-              <button className="link" onClick={() => focusOnWaypoint(marker.wpId)}>
-                {marker.name}
-              </button>
-              <span className="hint">#{marker.wpId}</span>
-            </div>
-          ))}
+    <>
+      <Section title="Groups">
+        <div className="field-row">
+          <input
+            className="input"
+            placeholder="New group name"
+            value={newGroup}
+            onChange={(event) => setNewGroup(event.target.value)}
+          />
+          <Button
+            disabled={!newGroup.trim() || state.network.groups.includes(newGroup.trim())}
+            onClick={addGroup}
+          >
+            Add
+          </Button>
         </div>
-      ))}
+      </Section>
 
       {state.network.markers.length === 0 && (
-        <p className="hint">No markers yet. Select a single node to add one.</p>
+        <EmptyState title="No markers yet">
+          Select a single waypoint to name it — markers are what AutoDrive routes to.
+        </EmptyState>
       )}
-    </div>
+
+      {Array.from(grouped.entries()).map(([group, markers]) => (
+        <Section key={group} title={`${group} · ${markers.length}`}>
+          {markers.map((marker) => (
+            <div key={marker.wpId} className="list-row">
+              <button className="link-btn grow" onClick={() => focusOnWaypoint(marker.wpId)}>
+                {marker.name}
+              </button>
+              <span className="sub">#{marker.wpId}</span>
+            </div>
+          ))}
+          {group !== "All" && markers.length === 0 && (
+            <Button
+              small
+              variant="ghost"
+              onClick={() =>
+                store.mutate((s) => (s.network.groups = s.network.groups.filter((g) => g !== group)))
+              }
+            >
+              Remove empty group
+            </Button>
+          )}
+        </Section>
+      ))}
+    </>
   );
 }
 

@@ -1,5 +1,8 @@
 import { useEffect, useRef } from "react";
 import { store } from "../state/store";
+import { useStore } from "../state/useStore";
+import { CanvasOverlays } from "../ui/overlays/CanvasOverlays";
+import { Toasts } from "../ui/overlays/Toasts";
 import { renderScene } from "./renderScene";
 import { useCanvasInteraction } from "./useCanvasInteraction";
 import { createViewport } from "./viewport";
@@ -11,9 +14,10 @@ interface EditorCanvasProps {
 /**
  * Hosts the canvas element: keeps its backing store sized to the element,
  * runs the animation frame loop, and forwards pointer events. Drawing lives
- * in renderScene, interaction in useCanvasInteraction.
+ * in renderScene, interaction in useCanvasInteraction, chrome in the overlays.
  */
 export function EditorCanvas({ onCursorMove }: EditorCanvasProps) {
+  const state = useStore();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const interaction = useCanvasInteraction(canvasRef, onCursorMove);
 
@@ -41,7 +45,7 @@ export function EditorCanvas({ onCursorMove }: EditorCanvasProps) {
   }, [interaction.cursorRef, interaction.marqueeRef]);
 
   return (
-    <div className="editor-canvas">
+    <div className={state.blueprintEdit ? "editor-canvas blueprint-frame" : "editor-canvas"}>
       <canvas
         ref={canvasRef}
         onWheel={interaction.onWheel}
@@ -51,6 +55,8 @@ export function EditorCanvas({ onCursorMove }: EditorCanvasProps) {
         onMouseLeave={interaction.onMouseLeave}
         onContextMenu={(event) => event.preventDefault()}
       />
+      <CanvasOverlays />
+      <Toasts />
     </div>
   );
 }

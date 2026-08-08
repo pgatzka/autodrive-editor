@@ -1,7 +1,7 @@
 import { loadBackgroundFrom, pickBackgroundFolder } from "../../files/fileio";
 import { store } from "../../state/store";
 import { useStore } from "../../state/useStore";
-import { CheckboxField, Field } from "../components/Field";
+import { Button, Section, Toggle } from "../components/controls";
 
 /** Terrain background loaded from an FS25 savegame folder. */
 export function BackgroundPanel() {
@@ -9,36 +9,41 @@ export function BackgroundPanel() {
   const background = state.background;
 
   return (
-    <div>
-      <h4>Map background</h4>
+    <Section title="Map background">
       {background ? (
         <p className="hint">
           {background.mapTitle || "Unknown map"} · {background.sizeMeters} m ·{" "}
-          {background.hasGroundTextures ? "ground textures" : "elevation only"} ·{" "}
-          {background.placeables.length} placeables · {background.vehicles.length} vehicles
+          {background.hasGroundTextures ? "ground textures" : "elevation only"}
         </p>
       ) : (
         <p className="hint">
-          Loaded automatically when you open an AutoDrive_config.xml inside a savegame folder, or pick the
-          folder manually. New nodes get their height from the real terrain.
+          Loaded automatically with a config inside a savegame folder. New waypoints then take their height
+          from the real terrain.
         </p>
       )}
 
-      <div className="row">
-        <button onClick={() => void pickBackgroundFolder()}>Load savegame folder…</button>
+      <div className="field-row">
+        <Button wide onClick={() => void pickBackgroundFolder()}>
+          Load savegame folder…
+        </Button>
         {background && state.filePath && (
-          <button onClick={() => void loadBackgroundFrom(state.filePath!, false)}>Reload</button>
+          <Button variant="ghost" onClick={() => void loadBackgroundFrom(state.filePath!, false)}>
+            Reload
+          </Button>
         )}
         {background && (
-          <button className="danger" onClick={() => store.update((s) => (s.background = null))}>
+          <Button variant="ghost" onClick={() => store.update((s) => (s.background = null))}>
             Clear
-          </button>
+          </Button>
         )}
       </div>
 
       {background && (
         <>
-          <Field label={`Opacity: ${Math.round(state.settings.backgroundOpacity * 100)}%`}>
+          <label className="field-col">
+            <span className="label">
+              Terrain opacity · {Math.round(state.settings.backgroundOpacity * 100)}%
+            </span>
             <input
               type="range"
               min={0}
@@ -48,14 +53,14 @@ export function BackgroundPanel() {
                 store.update((s) => (s.settings.backgroundOpacity = Number(event.target.value) / 100))
               }
             />
-          </Field>
-          <CheckboxField
+          </label>
+          <Toggle
             label="Show placeables & vehicles"
             checked={state.settings.showIcons}
             onChange={(checked) => store.update((s) => (s.settings.showIcons = checked))}
           />
         </>
       )}
-    </div>
+    </Section>
   );
 }

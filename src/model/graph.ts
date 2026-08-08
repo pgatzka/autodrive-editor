@@ -15,6 +15,50 @@ export function addWaypoint(net: RouteNetwork, x: number, y: number, z: number, 
   return wp;
 }
 
+export interface DeletionImpact {
+  /** waypoints that would be removed */
+  nodes: number;
+  /** connections removed, counted once per pair */
+  connections: number;
+  /** of those, links reaching a waypoint that survives */
+  externalLinks: number;
+  /** names of markers that would go with the nodes */
+  markers: string[];
+}
+
+/**
+ * What deleting a selection would take with it. Used to state collateral
+ * damage before the user commits — links leaving the selection and markers
+ * riding along are the parts they cannot see.
+ */
+export function deletionImpact(net: RouteNetwork, ids: Iterable<number>): DeletionImpact {
+  const doomed = new Set(ids);
+  const pairs = new Set<string>();
+  const externalPairs = new Set<string>();
+
+  for (const id of doomed) {
+    const waypoint = net.waypoints.get(id);
+    if (!waypoint) continue;
+    const neighbours = new Set([...waypoint.out, ...waypoint.incoming]);
+    for (const other of net.waypoints.values()) {
+      if (other.out.includes(id)) neighbours.add(other.id);
+    }
+    for (const neighbour of neighbours) {
+      if (neighbour === id || !net.waypoints.has(neighbour)) continue;
+      const key = id < neighbour ? `${id}-${neighbour}` : `${neighbour}-${id}`;
+      pairs.add(key);
+      if (!doomed.has(neighbour)) externalPairs.add(key);
+    }
+  }
+
+  return {
+    nodes: Array.from(doomed).filter((id) => net.waypoints.has(id)).length,
+    connections: pairs.size,
+    externalLinks: externalPairs.size,
+    markers: net.markers.filter((marker) => doomed.has(marker.wpId)).map((marker) => marker.name),
+  };
+}
+
 export function deleteWaypoints(net: RouteNetwork, ids: Iterable<number>) {
   const doomed = new Set(ids);
   for (const id of doomed) net.waypoints.delete(id);

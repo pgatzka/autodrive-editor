@@ -7,6 +7,12 @@ A desktop editor for route networks of the [AutoDrive](https://github.com/Stepha
 
 ![Screenshot](docs/screenshot.png)
 
+The interface follows a dedicated design system: a dark desktop shell where the
+canvas is the only thing that grows, the active tool is the single accent-filled
+control on screen, and the blueprint workspace announces itself through four
+independent signals. See [docs/ui-revamp-brief.md](docs/ui-revamp-brief.md) for
+the brief it was built from.
+
 ## Features
 
 - **Import / export `AutoDrive_config.xml`** — exact FS25 format. Waypoint ids are compacted to `1..N` on save, and all other sections of an imported file (user settings, experimental features, …) are preserved untouched.

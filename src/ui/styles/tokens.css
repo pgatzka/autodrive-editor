@@ -1,0 +1,110 @@
+/**
+ * Design tokens — the single source of truth for chrome styling.
+ * Values come from the AutoDrive Editor design system (docs/ui-revamp-brief.md
+ * → delivered spec). Canvas colours are NOT here: the canvas is drawn
+ * imperatively and takes its values from editor/theme.ts.
+ */
+
+:root {
+  /* Surfaces — chrome only, never used on the canvas */
+  --surface-app: #0e1213;
+  --surface-panel: #151a1c;
+  --surface-strip: #111618;
+  --surface-raised: #1c2325;
+  --surface-inset: #0a0d0e;
+
+  /* Borders & text (AA against --surface-panel) */
+  --border-subtle: #232b2e;
+  --border-strong: #2f3b3d;
+  --text-primary: #e6edec;
+  --text-secondary: #9fb0ae;
+  --text-tertiary: #6b7b7a;
+  --text-disabled: #4e5a58;
+
+  /* Accent — amber means "the app is yours to act on" */
+  --accent: #f2a93b;
+  --accent-hover: #ffbd57;
+  --accent-press: #d9922b;
+  --accent-fg: #1a1206;
+  --accent-wash: #f2a93b29;
+
+  /* Semantic — each owns exactly one meaning */
+  --info: #4ec9f5;
+  --success: #5bd6a0;
+  --warning: #f2a93b;
+  --danger: #ff5c63;
+  --danger-solid: #e5484d;
+
+  /* Blueprint mode swaps the accent wholesale */
+  --blueprint: #8b7bf0;
+  --blueprint-fg: #0c0820;
+  --blueprint-canvas: #1a1630;
+  --blueprint-wash: #8b7bf02e;
+
+  /* Type */
+  --font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+
+  --text-display: 700 40px/44px var(--font-display);
+  --text-title: 700 17px/24px var(--font-display);
+  --text-metric: 700 26px/30px var(--font-display);
+  --text-body: 400 13.5px/20px var(--font-ui);
+  --text-ui: 500 12.5px/18px var(--font-ui);
+  --text-eyebrow: 700 11px/14px var(--font-ui);
+  --text-mono: 400 11.5px/16px var(--font-mono);
+
+  /* Spacing — 4 px base */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Control height ladder */
+  --control-xs: 26px;
+  --control-sm: 28px;
+  --control-md: 30px;
+  --control-lg: 32px;
+  --control-xl: 34px;
+
+  /* Radii */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 9px;
+  --radius-xl: 12px;
+
+  /* Elevation — borders do the work; shadows only float over the canvas */
+  --border-inset: inset 0 0 0 1px var(--border-subtle);
+  --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.6);
+  --focus-ring: 0 0 0 3px rgba(242, 169, 59, 0.3);
+
+  /* Fixed chrome heights — the canvas is the only thing that grows */
+  --h-titlebar: 44px;
+  --h-toolstrip: 52px;
+  --h-statusbar: 30px;
+  --w-inspector: 336px;
+}
+
+/**
+ * Blueprint workspace: the accent is replaced everywhere at once, so every
+ * accent-driven control changes together without per-component branching.
+ */
+.blueprint-mode {
+  --accent: var(--blueprint);
+  --accent-hover: #a294f5;
+  --accent-press: #7566e0;
+  --accent-fg: var(--blueprint-fg);
+  --accent-wash: var(--blueprint-wash);
+  --focus-ring: 0 0 0 3px rgba(139, 123, 240, 0.35);
+}
+
+@media (max-width: 1599px) {
+  :root {
+    --w-inspector: 300px;
+  }
+}

@@ -7,6 +7,7 @@ import {
   connectionBetween,
   cycleConnection,
   deleteWaypoints,
+  deletionImpact,
   disconnect,
   evenlySpaceChain,
   insertMidpoint,
@@ -15,6 +16,7 @@ import {
   smoothCurve,
 } from "../model/graph";
 import { ConnectionMode } from "../model/types";
+import { closeDialog, confirmAction, showToast } from "./feedback";
 import { store } from "./store";
 
 /**
@@ -114,13 +116,65 @@ export function spaceSelectionEvenly(ids: Iterable<number>): void {
   });
 }
 
+/** Above this many nodes a delete asks first, so the dialog never becomes noise. */
+export const DELETE_CONFIRM_THRESHOLD = 5;
+const DELETE_SUPPRESS_KEY = "delete-waypoints";
+
+/**
+ * Delete the selection, asking first when the loss is large. The dialog names
+ * collateral damage the user cannot see — links leaving the selection and
+ * markers riding along — and the resulting toast carries Undo itself.
+ */
+export function requestDeleteSelection(): void {
+  const state = store.state;
+  if (state.selection.size === 0) return;
+
+  const impact = deletionImpact(state.network, state.selection);
+  if (impact.nodes <= DELETE_CONFIRM_THRESHOLD) {
+    deleteSelection();
+    return;
+  }
+
+  const ids = new Set(state.selection);
+  store.update((s) => (s.pendingDeletion = ids));
+  confirmAction({
+    title: `Delete ${impact.nodes} waypoints?`,
+    body: describeImpact(impact),
+    detail: "Undoable with Ctrl+Z right after.",
+    confirmLabel: "Delete waypoints",
+    suppressKey: DELETE_SUPPRESS_KEY,
+    onConfirm: () => {
+      closeDialog();
+      deleteSelection();
+    },
+  });
+}
+
+function describeImpact(impact: ReturnType<typeof deletionImpact>): string {
+  const parts = [`This also removes ${impact.connections} connections`];
+  if (impact.externalLinks > 0) {
+    parts.push(`including ${impact.externalLinks} link(s) to waypoints outside the selection`);
+  }
+  if (impact.markers.length > 0) {
+    parts.push(`and the marker${impact.markers.length > 1 ? "s" : ""} ${impact.markers.join(", ")}`);
+  }
+  return `${parts.join(", ")}.`;
+}
+
 export function deleteSelection(): void {
-  if (store.state.selection.size === 0) return;
+  const state = store.state;
+  if (state.selection.size === 0) return;
+  const impact = deletionImpact(state.network, state.selection);
+
   store.mutate((s) => {
-    const count = s.selection.size;
     deleteWaypoints(s.network, s.selection);
     s.selection = new Set();
-    s.statusMessage = `Deleted ${count} node(s)`;
+    s.pendingDeletion = null;
+    s.statusMessage = `Deleted ${impact.nodes} waypoints`;
+  });
+  showToast("danger", `Deleted ${impact.nodes} waypoints`, {
+    detail: `${impact.connections} connections removed`,
+    undo: () => store.undo(),
   });
 }
 

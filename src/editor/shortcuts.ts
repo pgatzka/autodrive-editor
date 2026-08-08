@@ -1,6 +1,7 @@
 import { openConfig, saveConfig } from "../files/fileio";
-import { cancelCurrentInteraction, deleteSelection, selectAll } from "../state/actions";
+import { cancelCurrentInteraction, requestDeleteSelection, selectAll } from "../state/actions";
 import { saveBlueprintEditor } from "../state/blueprintSession";
+import { setShortcutsOpen } from "../state/feedback";
 import { store, Tool } from "../state/store";
 
 /** Tools reachable with keys 1..4, matching the toolbar order. */
@@ -44,7 +45,7 @@ function handleModified(event: KeyboardEvent): boolean {
 function handlePlain(event: KeyboardEvent): boolean {
   if (event.key === "Delete" || event.key === "Backspace") {
     if (store.state.selection.size === 0) return false;
-    deleteSelection();
+    requestDeleteSelection();
     return true;
   }
   if (event.key === "Escape") {
@@ -53,6 +54,10 @@ function handlePlain(event: KeyboardEvent): boolean {
   }
   if (event.key.toLowerCase() === "r" && store.state.placement) {
     rotatePlacement(event.shiftKey ? -BLUEPRINT_ROTATE_STEP_DEG : BLUEPRINT_ROTATE_STEP_DEG);
+    return true;
+  }
+  if (event.key === "?") {
+    setShortcutsOpen(true);
     return true;
   }
   if (event.key.toLowerCase() === "g") {

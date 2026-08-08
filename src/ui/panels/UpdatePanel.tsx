@@ -8,16 +8,23 @@ import {
   UpdateChannel,
 } from "../../model/updates";
 import { AdBridge, bridge } from "../../state/store";
+import { Button, Section, Segmented } from "../components/controls";
 
-/** In-app updater: stable releases or automatically published dev builds. */
+/**
+ * The lowest-priority surface in the app: last in the File tab, and never
+ * amber — an available update is informational, not a call to action
+ * competing with Save.
+ */
 export function UpdatePanel() {
   const adBridge = bridge();
-  return adBridge ? (
-    <UpdateControls bridge={adBridge} />
-  ) : (
-    <p className="hint">Updates are only available in the desktop app.</p>
-  );
+  if (!adBridge) return <p className="hint">Updates are only available in the desktop app.</p>;
+  return <UpdateControls bridge={adBridge} />;
 }
+
+const CHANNELS = [
+  { id: "stable" as const, label: "Stable", hint: "Published releases" },
+  { id: "unstable" as const, label: "Unstable", hint: "Dev builds from every change on main" },
+];
 
 function UpdateControls({ bridge: adBridge }: { bridge: AdBridge }) {
   const [version, setVersion] = useState("dev");
@@ -51,7 +58,7 @@ function UpdateControls({ bridge: adBridge }: { bridge: AdBridge }) {
       const releases = (await adBridge.checkUpdates(undefined)) as ReleaseInfo[];
       const found = pickLatest(releases, channel);
       setLatest(found);
-      setStatus(found ? describeUpdate(found, version, channel) : "No releases found on this channel yet.");
+      setStatus(found ? describeUpdate(found, version, channel) : "No releases on this channel yet.");
     } catch (error) {
       setStatus(`Check failed: ${errorMessage(error)}`);
     } finally {
@@ -67,12 +74,12 @@ function UpdateControls({ bridge: adBridge }: { bridge: AdBridge }) {
       return;
     }
     setBusy(true);
-    setStatus(`Downloading ${asset.name} (${(asset.size / 1e6).toFixed(1)} MB)…`);
+    setStatus(`Downloading ${asset.name}…`);
     try {
       const result = await adBridge.downloadUpdate(asset, undefined);
       setStatus(
         result.launched
-          ? "Installer started — it will replace this installation. The app may close."
+          ? "Installer started — it will replace this installation."
           : `Saved to ${result.path}. Run it to update.`
       );
     } catch (error) {
@@ -82,80 +89,44 @@ function UpdateControls({ bridge: adBridge }: { bridge: AdBridge }) {
     }
   };
 
-  const updateAvailable = latest !== null && compareVersions(latest.version, version) > 0;
+  const update = latest && compareVersions(latest.version, version) > 0 ? latest : null;
 
   return (
-    <div>
-      <h4>Updates</h4>
-      <p className="hint">Installed version: {version}</p>
-
-      <div className="row">
-        <ChannelRadio label="Stable" value="stable" active={channel} onSelect={selectChannel} />
-        <ChannelRadio
-          label="Unstable (dev builds)"
-          value="unstable"
-          active={channel}
-          onSelect={selectChannel}
-        />
+    <Section title="Updates">
+      <div className="field-row">
+        <span className="hint mono" style={{ flex: 1 }}>
+          v{version}
+        </span>
+        <Segmented ariaLabel="Update channel" options={CHANNELS} value={channel} onChange={selectChannel} />
       </div>
-      {channel === "unstable" && (
-        <p className="hint">Dev builds are published automatically from every change on main.</p>
+
+      {update && (
+        <div className="update-banner">
+          <span className="grow">{update.version} available</span>
+          <Button small onClick={() => void download()} disabled={busy}>
+            Download &amp; install
+          </Button>
+        </div>
       )}
 
-      <div className="row">
-        <button disabled={busy} onClick={() => void check()}>
-          Check for updates
-        </button>
-        {updateAvailable && (
-          <button disabled={busy} onClick={() => void download()}>
-            Download &amp; install
+      <div className="field-row">
+        <Button small variant="ghost" disabled={busy} onClick={() => void check()}>
+          Check now
+        </Button>
+        {latest && !latest.draft && (
+          <button className="link-btn" onClick={() => void adBridge.openReleasePage(latest.htmlUrl)}>
+            Release notes
           </button>
         )}
       </div>
       {status && <p className="hint">{status}</p>}
-      {latest && <ReleaseSummary release={latest} onOpen={(url) => void adBridge.openReleasePage(url)} />}
-    </div>
-  );
-}
-
-function ChannelRadio({
-  label,
-  value,
-  active,
-  onSelect,
-}: {
-  label: string;
-  value: UpdateChannel;
-  active: UpdateChannel;
-  onSelect: (channel: UpdateChannel) => void;
-}) {
-  return (
-    <label className="row">
-      <input type="radio" name="channel" checked={active === value} onChange={() => onSelect(value)} />
-      {label}
-    </label>
-  );
-}
-
-function ReleaseSummary({ release, onOpen }: { release: ReleaseInfo; onOpen: (url: string) => void }) {
-  const kind = release.draft ? "draft" : release.prerelease ? "prerelease" : "release";
-  return (
-    <div className="group-block">
-      <p className="hint">
-        {release.name} · {kind} · {new Date(release.publishedAt ?? release.createdAt).toLocaleDateString()}
-      </p>
-      {!release.draft && (
-        <button className="link" onClick={() => onOpen(release.htmlUrl)}>
-          Open release page
-        </button>
-      )}
-    </div>
+    </Section>
   );
 }
 
 function describeUpdate(release: ReleaseInfo, installed: string, channel: UpdateChannel): string {
   const comparison = compareVersions(release.version, installed);
-  if (comparison > 0) return `Update available: ${release.version} (installed: ${installed})`;
+  if (comparison > 0) return `Update available: ${release.version}`;
   if (comparison === 0) return `You are up to date (${installed}).`;
-  return `Installed version ${installed} is newer than the latest ${channel} release (${release.version}).`;
+  return `Installed ${installed} is newer than the latest ${channel} release (${release.version}).`;
 }

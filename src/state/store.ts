@@ -11,6 +11,29 @@ export interface ViewTransform {
   scale: number;
 }
 
+/** Feedback ladder: ambient status line, toast, toast+undo, blocking dialog. */
+export type ToastKind = "success" | "info" | "danger";
+
+export interface Toast {
+  id: number;
+  kind: ToastKind;
+  title: string;
+  detail?: string;
+  /** when set, the toast carries the recovery action itself */
+  undo?: () => void;
+  timeoutMs: number;
+}
+
+export interface ConfirmDialog {
+  title: string;
+  body: string;
+  detail?: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  /** lets the user silence this class of confirmation for the session */
+  suppressKey?: string;
+}
+
 export interface EditorSettings {
   gridSize: number;
   snapEnabled: boolean;
@@ -61,6 +84,13 @@ export interface EditorState {
   blueprintEdit: BlueprintEditSession | null;
   /** terrain background loaded from a savegame folder */
   background: SavegameBackground | null;
+  /** nodes about to be deleted, drawn red while the confirmation is open */
+  pendingDeletion: Set<number> | null;
+  toasts: Toast[];
+  dialog: ConfirmDialog | null;
+  shortcutsOpen: boolean;
+  /** confirmations the user silenced for this session */
+  suppressedConfirmations: Set<string>;
   dirty: boolean;
   statusMessage: string;
 }
@@ -108,6 +138,11 @@ export class EditorStore {
     blueprints: [],
     blueprintEdit: null,
     background: null,
+    pendingDeletion: null,
+    toasts: [],
+    dialog: null,
+    shortcutsOpen: false,
+    suppressedConfirmations: new Set(),
     dirty: false,
     statusMessage: "Open an AutoDrive_config.xml or start placing nodes",
   };
