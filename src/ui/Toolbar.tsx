@@ -3,7 +3,7 @@ import { ConnectionMode } from "../model/types";
 import { setShortcutsOpen } from "../state/feedback";
 import { store, Tool } from "../state/store";
 import { useStore } from "../state/useStore";
-import { Button, cx, Keycap, SegmentedOption, Segmented, Stepper } from "./components/controls";
+import { Button, cx, Keycap, NumberInput, Segmented, SegmentedOption, Stepper } from "./components/controls";
 
 /**
  * Row 2 — everything touched while building. The active tool is the only
@@ -86,20 +86,20 @@ export function Toolbar() {
         <Stepper
           ariaLabel="grid size"
           value={state.settings.gridSize}
-          format={(value) => `${value} m`}
-          onStep={(direction) =>
-            store.update((s) => (s.settings.gridSize = stepGrid(s.settings.gridSize, direction)))
-          }
+          suffix="m"
+          rules={{ min: MIN_GRID_SIZE, max: MAX_GRID_SIZE, decimals: 1 }}
+          onCommit={(size) => setGridSize(size)}
+          onStep={(direction) => setGridSize(stepGrid(state.settings.gridSize, direction))}
         />
         <OffsetField
           axis="X"
           value={state.settings.gridOffsetX}
-          onChange={(value) => store.update((s) => (s.settings.gridOffsetX = value))}
+          onCommit={(value) => store.update((s) => (s.settings.gridOffsetX = value))}
         />
         <OffsetField
           axis="Z"
           value={state.settings.gridOffsetZ}
-          onChange={(value) => store.update((s) => (s.settings.gridOffsetZ = value))}
+          onCommit={(value) => store.update((s) => (s.settings.gridOffsetZ = value))}
         />
         <button
           className={cx("snap-toggle", state.settings.snapEnabled && "on")}
@@ -141,28 +141,27 @@ export function Toolbar() {
 function OffsetField({
   axis,
   value,
-  onChange,
+  onCommit,
 }: {
   axis: "X" | "Z";
   value: number;
-  onChange: (value: number) => void;
+  onCommit: (value: number) => void;
 }) {
   const state = useStore();
+  const size = state.settings.gridSize;
   return (
-    <label className="offset-field" title={`Shift the grid along ${axis} (0 – ${state.settings.gridSize} m)`}>
+    <span className="offset-field" title={`Shift the grid along ${axis} (0 – ${size} m)`}>
       <span className="axis">{axis}</span>
-      <input
-        className="input mono"
-        type="number"
-        step={0.5}
+      <NumberInput
         value={value}
-        aria-label={`Grid offset ${axis}`}
-        onChange={(event) => {
-          const parsed = Number(event.target.value);
-          if (Number.isFinite(parsed)) onChange(wrapOffset(parsed, state.settings.gridSize));
-        }}
+        ariaLabel={`Grid offset ${axis}`}
+        width={50}
+        className="bare"
+        // an offset beyond one cell is the same grid, so it wraps on commit
+        rules={{ decimals: 1, transform: (offset) => wrapOffset(offset, size) }}
+        onCommit={onCommit}
       />
-    </label>
+    </span>
   );
 }
 
@@ -174,9 +173,27 @@ export function selectTool(tool: Tool): void {
   });
 }
 
-/** Grid sizes players actually use, rather than free-form decimals. */
+export const MIN_GRID_SIZE = 0.1;
+export const MAX_GRID_SIZE = 500;
+
+/**
+ * Changing the size keeps the offsets inside the new cell, so the grid never
+ * ends up with an offset larger than its own spacing.
+ */
+function setGridSize(size: number): void {
+  store.update((s) => {
+    s.settings.gridSize = size;
+    s.settings.gridOffsetX = wrapOffset(s.settings.gridOffsetX, size);
+    s.settings.gridOffsetZ = wrapOffset(s.settings.gridOffsetZ, size);
+  });
+}
+
+/** The − / + buttons walk the sizes players actually use; typing allows any. */
 export function stepGrid(current: number, direction: -1 | 1): number {
   const index = GRID_STEPS.findIndex((step) => step >= current - 1e-9);
-  const next = index === -1 ? GRID_STEPS.length - 1 : index + direction;
+  if (index === -1) return GRID_STEPS[GRID_STEPS.length - 1];
+  // stepping up from a value between two rungs lands on the next rung up
+  const onRung = Math.abs(GRID_STEPS[index] - current) < 1e-9;
+  const next = onRung ? index + direction : direction === 1 ? index : index - 1;
   return GRID_STEPS[Math.min(Math.max(next, 0), GRID_STEPS.length - 1)];
 }

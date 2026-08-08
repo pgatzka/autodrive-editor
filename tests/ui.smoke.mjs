@@ -91,6 +91,26 @@ try {
   await page.click("button:has-text('Discard')");
   check((await page.locator(".canvas-banner").count()) === 0, "blueprint workspace closes");
 
+  // the numeric fields accept typed decimals (a controlled input that
+  // re-parsed on every keystroke used to eat the decimal point)
+  const gridSize = page.getByRole("textbox", { name: "grid size" });
+  await gridSize.click();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.type("2.5", { delay: 20 });
+  check((await gridSize.inputValue()) === "2.5", "decimal survives typing");
+  await page.keyboard.press("Enter");
+  const offsetX = page.getByRole("textbox", { name: "Grid offset X" });
+  await offsetX.click();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.type("1.7");
+  await page.keyboard.press("Enter");
+  const gridState = await page.evaluate(async () => {
+    const { store } = await import("/src/state/store.ts");
+    return { size: store.state.settings.gridSize, x: store.state.settings.gridOffsetX };
+  });
+  check(gridState.size === 2.5, `typed grid size committed (got ${gridState.size})`);
+  check(gridState.x === 1.7, `typed offset committed (got ${gridState.x})`);
+
   // shortcuts sheet opens from the strip and closes on Escape
   await page.click("button:has-text('Shortcuts')");
   check(await page.locator(".dialog").isVisible(), "shortcuts dialog opens");

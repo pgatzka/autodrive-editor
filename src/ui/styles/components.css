@@ -262,11 +262,36 @@ select {
   color: var(--text-primary);
 }
 
-.stepper .value {
-  min-width: 46px;
+/* the number sits between the − / + buttons and stays typeable */
+.number-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.number-input .input {
   text-align: center;
+}
+
+.number-input .suffix {
+  color: var(--text-tertiary);
   font: var(--text-mono);
-  color: var(--text-primary);
+  padding-right: var(--space-1);
+}
+
+.number-input.bare .input {
+  height: calc(var(--control-xs) - 2px);
+  padding: 0 var(--space-1);
+  background: transparent;
+  box-shadow: none;
+}
+
+.number-input.bare .input:hover {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.number-input.bare .input:focus {
+  box-shadow: var(--focus-ring);
 }
 
 /* ---------- toggle ---------- */
@@ -869,14 +894,6 @@ input[type="range"]::-webkit-slider-thumb {
   font: var(--text-eyebrow);
 }
 
-.offset-field .input {
-  width: 56px;
-  height: calc(var(--control-xs) - 2px);
-  padding: 0 var(--space-1);
-  background: transparent;
-  box-shadow: none;
-}
-
-.offset-field .input:focus {
-  box-shadow: var(--focus-ring);
+.offset-field {
+  padding-right: var(--space-1);
 }

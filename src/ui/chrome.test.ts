@@ -39,8 +39,9 @@ describe("stepGrid", () => {
     expect(stepGrid(50, 1)).toBe(50);
   });
 
-  it("snaps a value from outside the ladder onto it", () => {
-    expect(stepGrid(3, 1)).toBe(5);
+  it("steps onto the ladder from a typed value between two rungs", () => {
+    // 3 was typed by hand; stepping moves to the neighbouring rungs
+    expect(stepGrid(3, 1)).toBe(4);
     expect(stepGrid(3, -1)).toBe(2.5);
     expect(stepGrid(999, -1)).toBe(50);
   });

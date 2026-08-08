@@ -13,7 +13,7 @@ import {
 } from "../../state/actions";
 import { store } from "../../state/store";
 import { useStore } from "../../state/useStore";
-import { Button, EmptyState, Section, Toggle } from "../components/controls";
+import { Button, EmptyState, NumberInput, Section, Toggle } from "../components/controls";
 import { MarkerEditor } from "./MarkerEditor";
 
 /**
@@ -199,17 +199,12 @@ function RouteTools({ selected }: { selected: Waypoint[] }) {
         <span className="hint" style={{ flex: 1 }}>
           Smooth segments
         </span>
-        <input
-          className="input mono"
-          type="number"
-          min={2}
-          max={64}
-          style={{ width: 64 }}
+        <NumberInput
           value={state.settings.curveSegments}
-          onChange={(event) => {
-            const value = Math.round(Number(event.target.value));
-            if (value >= 2 && value <= 64) store.update((s) => (s.settings.curveSegments = value));
-          }}
+          ariaLabel="Smooth segments"
+          width={64}
+          rules={{ min: 2, max: 64, decimals: 0 }}
+          onCommit={(value) => store.update((s) => (s.settings.curveSegments = value))}
         />
       </div>
       {/* the only red control in the panel, and it is last */}

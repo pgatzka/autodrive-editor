@@ -1,4 +1,5 @@
-import { ReactNode } from "react";
+import { ReactNode, useRef, useState } from "react";
+import { commitNumber, formatNumber, isPartialNumber, NumberRules } from "./numberInput";
 
 /**
  * Shared controls. Every one exposes the same states the design system
@@ -114,25 +115,112 @@ export function Toggle({
   );
 }
 
-/** Numeric stepper — grid size is adjusted far more often than it is typed. */
+/**
+ * A number you can both type and step.
+ *
+ * The typed text is held locally until the field is committed (blur or Enter)
+ * so intermediate states like "1." or "-" survive; Escape restores the stored
+ * value. Everything else in the app keeps reading a plain number.
+ */
+export function NumberInput({
+  value,
+  onCommit,
+  rules,
+  suffix,
+  width = 56,
+  ariaLabel,
+  className,
+}: {
+  value: number;
+  onCommit: (value: number) => void;
+  rules?: NumberRules;
+  suffix?: string;
+  width?: number;
+  ariaLabel: string;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  // Escape blurs the field, and the blur would otherwise commit the text that
+  // was just abandoned; this marks the edit as cancelled for that one blur.
+  const cancelled = useRef(false);
+  const stored = formatNumber(value, rules?.decimals ?? 1);
+
+  const commit = (text: string) => {
+    if (cancelled.current) {
+      cancelled.current = false;
+      setDraft(null);
+      return;
+    }
+    const committed = commitNumber(text, rules);
+    if (committed !== null) onCommit(committed);
+    setDraft(null);
+  };
+
+  return (
+    <span className={cx("number-input", className)}>
+      <input
+        className="input mono"
+        type="text"
+        inputMode="decimal"
+        aria-label={ariaLabel}
+        style={{ width }}
+        value={draft ?? stored}
+        onFocus={(event) => {
+          cancelled.current = false;
+          setDraft(stored);
+          event.target.select();
+        }}
+        onChange={(event) => {
+          if (isPartialNumber(event.target.value)) setDraft(event.target.value);
+        }}
+        onBlur={(event) => commit(event.target.value)}
+        onKeyDown={(event) => {
+          // the canvas shortcuts must not see keys typed into a field
+          event.stopPropagation();
+          if (event.key === "Enter") commit(event.currentTarget.value);
+          if (event.key === "Escape") {
+            cancelled.current = true;
+            setDraft(null);
+            event.currentTarget.blur();
+          }
+        }}
+      />
+      {suffix && <span className="suffix">{suffix}</span>}
+    </span>
+  );
+}
+
+/** A typeable number with − / + buttons around it. */
 export function Stepper({
   value,
-  format,
+  onCommit,
   onStep,
+  rules,
+  suffix,
   ariaLabel,
 }: {
   value: number;
-  format: (value: number) => string;
+  onCommit: (value: number) => void;
   onStep: (direction: -1 | 1) => void;
+  rules?: NumberRules;
+  suffix?: string;
   ariaLabel: string;
 }) {
   return (
     <div className="stepper" role="group" aria-label={ariaLabel}>
-      <button onClick={() => onStep(-1)} aria-label={`Decrease ${ariaLabel}`}>
+      <button onClick={() => onStep(-1)} aria-label={`Decrease ${ariaLabel}`} tabIndex={-1}>
         −
       </button>
-      <span className="value">{format(value)}</span>
-      <button onClick={() => onStep(1)} aria-label={`Increase ${ariaLabel}`}>
+      <NumberInput
+        value={value}
+        onCommit={onCommit}
+        rules={rules}
+        suffix={suffix}
+        width={44}
+        ariaLabel={ariaLabel}
+        className="bare"
+      />
+      <button onClick={() => onStep(1)} aria-label={`Increase ${ariaLabel}`} tabIndex={-1}>
         +
       </button>
     </div>
