@@ -13,6 +13,7 @@ import {
   smoothCurve,
 } from "../model/graph";
 import { FLAG_SUBPRIO, FLAG_TRAFFIC_SYSTEM } from "../model/types";
+import { enterBlueprintEditor } from "../state/blueprintSession";
 import { store } from "../state/store";
 import { useStore } from "../state/useStore";
 import { UpdatePanel } from "./UpdatePanel";
@@ -306,12 +307,29 @@ function MarkersPanel() {
 function BlueprintsPanel() {
   const s = useStore();
   const [name, setName] = useState("");
+  const editing = s.blueprintEdit;
 
   return (
     <div>
       <h3>Blueprints</h3>
+      {!editing && (
+        <div className="row">
+          <button
+            title="Open an empty blueprint canvas and build one from scratch with the normal tools"
+            onClick={() => enterBlueprintEditor(null)}
+          >
+            New blueprint
+          </button>
+          <button onClick={() => void importBlueprintFiles()}>Import…</button>
+        </div>
+      )}
+      {editing && (
+        <p className="hint">
+          Blueprint editor is open — use the map tools to build it, then Save &amp; close in the toolbar.
+        </p>
+      )}
       <div className="row">
-        <input placeholder="Blueprint name" value={name} onChange={(e) => setName(e.target.value)} />
+        <input placeholder="Name for captured selection" value={name} onChange={(e) => setName(e.target.value)} />
         <button
           disabled={s.selection.size === 0 || !name.trim()}
           title="Save the selected nodes and their connections as a reusable blueprint"
@@ -326,13 +344,12 @@ function BlueprintsPanel() {
             void persistBlueprintLibrary();
           }}
         >
-          Save selection
+          Capture
         </button>
       </div>
-      <div className="row">
-        <button onClick={() => void importBlueprintFiles()}>Import…</button>
-      </div>
-      {s.blueprints.length === 0 && <p className="hint">No blueprints yet. Select nodes, give it a name, hit "Save selection".</p>}
+      {s.blueprints.length === 0 && (
+        <p className="hint">No blueprints yet. Build one with "New blueprint" or capture a selection.</p>
+      )}
       {s.blueprints.map((bp, i) => (
         <div key={i} className="row marker-row">
           <span>
@@ -351,12 +368,21 @@ function BlueprintsPanel() {
             >
               Place
             </button>
+            {!editing && (
+              <button title="Open this blueprint in the blueprint editor" onClick={() => enterBlueprintEditor(i)}>
+                Edit
+              </button>
+            )}
             <button onClick={() => void exportBlueprintFile(bp)}>Export</button>
             <button
               className="danger"
+              disabled={editing?.index === i}
               onClick={() => {
                 store.update((st) => {
                   st.blueprints = st.blueprints.filter((_, j) => j !== i);
+                  if (st.blueprintEdit && st.blueprintEdit.index !== null && st.blueprintEdit.index > i) {
+                    st.blueprintEdit = { ...st.blueprintEdit, index: st.blueprintEdit.index - 1 };
+                  }
                 });
                 void persistBlueprintLibrary();
               }}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { EditorCanvas } from "./editor/EditorCanvas";
 import { loadBlueprintLibrary, openConfig, saveConfig } from "./files/fileio";
 import { deleteWaypoints } from "./model/graph";
+import { saveBlueprintEditor } from "./state/blueprintSession";
 import { store } from "./state/store";
 import { useStore } from "./state/useStore";
 import { Sidebar } from "./ui/Sidebar";
@@ -36,10 +37,11 @@ export default function App() {
         store.redo();
       } else if (ctrl && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        void saveConfig(e.shiftKey);
+        if (store.state.blueprintEdit) saveBlueprintEditor(false);
+        else void saveConfig(e.shiftKey);
       } else if (ctrl && e.key.toLowerCase() === "o") {
         e.preventDefault();
-        void openConfig();
+        if (!store.state.blueprintEdit) void openConfig();
       } else if (ctrl && e.key.toLowerCase() === "a") {
         e.preventDefault();
         store.update((st) => (st.selection = new Set(st.network.waypoints.keys())));
@@ -94,6 +96,7 @@ export default function App() {
         <Sidebar />
       </div>
       <div className="statusbar">
+        {s.blueprintEdit && <span className="mode-chip">BLUEPRINT</span>}
         <span>{s.statusMessage}</span>
         <span className="spacer" />
         <span>

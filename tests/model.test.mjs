@@ -119,6 +119,14 @@ const results = await page.evaluate(async (xmlText) => {
   const d0 = { x: s0.x - 100, z: s0.z - 100 };
   assert(Math.abs(d0.x) < 1e-6 && Math.abs(d0.z + 10) < 1e-6, "rotation applied, got " + JSON.stringify(d0));
 
+  // ---- blueprint editor round trip: blueprint -> network -> capture -> identical ----
+  const bpNet = bp.blueprintToNetwork(blueprint);
+  assert(bpNet.waypoints.size === 3, "blueprintToNetwork expands 3 nodes");
+  const recaptured = bp.captureBlueprint(bpNet, new Set(bpNet.waypoints.keys()), blueprint.name);
+  assert(JSON.stringify(recaptured.nodes) === JSON.stringify(blueprint.nodes), "blueprint nodes survive edit round trip");
+  assert(JSON.stringify(recaptured.edges) === JSON.stringify(blueprint.edges), "blueprint edges survive edit round trip");
+  assert(JSON.stringify(recaptured.markers) === JSON.stringify(blueprint.markers), "blueprint markers survive edit round trip");
+
   // ---- flags roundtrip: traffic system ----
   graph.setFlagOn(net4, [1], 2, true);
   const re3 = xml.parseAutoDriveXml(xml.serializeAutoDriveXml(net4));

@@ -1,5 +1,6 @@
 import { newConfig, openConfig, saveConfig } from "../files/fileio";
 import { ConnectionMode } from "../model/types";
+import { discardBlueprintEditor, saveBlueprintEditor } from "../state/blueprintSession";
 import { store, Tool } from "../state/store";
 import { useStore } from "../state/useStore";
 
@@ -20,12 +21,34 @@ export function Toolbar() {
   const s = useStore();
   return (
     <div className="toolbar">
-      <div className="tool-group">
-        <button onClick={() => newConfig()}>New</button>
-        <button onClick={() => void openConfig()}>Open…</button>
-        <button onClick={() => void saveConfig(false)}>Save{s.dirty ? " *" : ""}</button>
-        <button onClick={() => void saveConfig(true)}>Save As…</button>
-      </div>
+      {s.blueprintEdit ? (
+        <div className="tool-group blueprint-banner">
+          <span className="label">Blueprint:</span>
+          <input
+            value={s.blueprintEdit.name}
+            onChange={(e) =>
+              store.update((st) => {
+                if (st.blueprintEdit) st.blueprintEdit = { ...st.blueprintEdit, name: e.target.value };
+              })
+            }
+            style={{ width: 160 }}
+          />
+          <button title="Ctrl+S" onClick={() => saveBlueprintEditor(false)}>
+            Save
+          </button>
+          <button onClick={() => saveBlueprintEditor(true)}>Save &amp; close</button>
+          <button className="danger" onClick={() => discardBlueprintEditor()}>
+            Discard
+          </button>
+        </div>
+      ) : (
+        <div className="tool-group">
+          <button onClick={() => newConfig()}>New</button>
+          <button onClick={() => void openConfig()}>Open…</button>
+          <button onClick={() => void saveConfig(false)}>Save{s.dirty ? " *" : ""}</button>
+          <button onClick={() => void saveConfig(true)}>Save As…</button>
+        </div>
+      )}
 
       <div className="tool-group">
         {TOOLS.map((t) => (

@@ -15,6 +15,8 @@ import { useStore } from "../state/useStore";
 
 const COLORS = {
   background: "#3a5a40",
+  backgroundBlueprint: "#34505c",
+  anchor: "rgba(255,255,255,0.65)",
   gridMinor: "rgba(255,255,255,0.07)",
   gridMajor: "rgba(255,255,255,0.16)",
   oneway: "#7ddc7d",
@@ -116,7 +118,7 @@ export function EditorCanvas({ onCursor }: { onCursor: (x: number, z: number) =>
     const toSX = (wx: number) => (wx - view.cx) * view.scale + w / 2;
     const toSY = (wz: number) => (wz - view.cz) * view.scale + h / 2;
 
-    ctx.fillStyle = COLORS.background;
+    ctx.fillStyle = s.blueprintEdit ? COLORS.backgroundBlueprint : COLORS.background;
     ctx.fillRect(0, 0, w, h);
 
     // grid
@@ -183,6 +185,37 @@ export function EditorCanvas({ onCursor }: { onCursor: (x: number, z: number) =>
         ctx.stroke();
         ctx.setLineDash([]);
       }
+    }
+
+    // blueprint mode: crosshair at the stamp anchor (centroid of all nodes, origin when empty)
+    if (s.blueprintEdit) {
+      let ax = 0;
+      let az = 0;
+      if (network.waypoints.size > 0) {
+        for (const wp of network.waypoints.values()) {
+          ax += wp.x;
+          az += wp.z;
+        }
+        ax /= network.waypoints.size;
+        az /= network.waypoints.size;
+      }
+      const sx = toSX(ax);
+      const sy = toSY(az);
+      ctx.strokeStyle = COLORS.anchor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx - 14, sy);
+      ctx.lineTo(sx + 14, sy);
+      ctx.moveTo(sx, sy - 14);
+      ctx.lineTo(sx, sy + 14);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = COLORS.anchor;
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("anchor", sx + 12, sy - 8);
     }
 
     // nodes

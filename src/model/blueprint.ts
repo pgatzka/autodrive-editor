@@ -1,5 +1,5 @@
 import { connect } from "./graph";
-import { Blueprint, RouteNetwork, Waypoint } from "./types";
+import { Blueprint, emptyNetwork, RouteNetwork, Waypoint } from "./types";
 
 /** Capture the selected nodes (and the connections among them) as a reusable blueprint. */
 export function captureBlueprint(net: RouteNetwork, ids: Set<number>, name: string): Blueprint | null {
@@ -110,6 +110,26 @@ export function stampBlueprint(net: RouteNetwork, bp: Blueprint, p: Placement, b
     if (!net.groups.includes(m.group)) net.groups.push(m.group);
   }
   return ids;
+}
+
+/**
+ * Expand a blueprint into a standalone network for the blueprint editor,
+ * centered on the origin. captureBlueprint() of all its nodes round-trips.
+ */
+export function blueprintToNetwork(bp: Blueprint): RouteNetwork {
+  const net = emptyNetwork();
+  const ids: number[] = [];
+  for (const n of bp.nodes) {
+    const wp: Waypoint = { id: net.nextId++, x: n.x, y: n.y, z: n.z, out: [], incoming: [], flags: n.flags };
+    net.waypoints.set(wp.id, wp);
+    ids.push(wp.id);
+  }
+  for (const e of bp.edges) connect(net, ids[e.from], ids[e.to], e.kind);
+  for (const m of bp.markers) {
+    net.markers.push({ wpId: ids[m.node], name: m.name, group: m.group });
+    if (!net.groups.includes(m.group)) net.groups.push(m.group);
+  }
+  return net;
 }
 
 export function isBlueprint(v: unknown): v is Blueprint {

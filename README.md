@@ -14,6 +14,7 @@ A desktop editor for route networks of the [AutoDrive](https://github.com/Stepha
 - **Grid route tool** — connect two nodes and a node is created at *every grid-line crossing* along the route, spaced by your grid setting.
 - **Full node/edge editing** — add, move, delete; one-way, two-way, and reverse connections; box select; undo/redo.
 - **Blueprints** — save any selection (nodes + connections + markers) as a named blueprint, stamp it anywhere with live move/rotate preview. The library persists between sessions and blueprints can be exported/imported as JSON files to share.
+- **Blueprint editor** — build or rework blueprints from scratch on their own canvas ("New blueprint" / "Edit" in the Blueprints tab): all normal tools work there (add, connect, grid route, flags, markers, undo), a crosshair marks the stamp anchor, and Save & close returns you to your map exactly as you left it.
 - **Flags** — toggle subprio (pathfinding cost ×20) and traffic-system flags per selection; subprio nodes render yellow.
 - **Markers & groups** — create, rename, and delete map markers and organize them into groups.
 - **Route tools** — insert midpoint on a connection, distribute a run of nodes evenly, generate a smooth curve between two nodes (tangents follow the adjoining roads).

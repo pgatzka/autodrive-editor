@@ -22,6 +22,25 @@ export interface PendingPlacement {
   rotation: number;
 }
 
+/** Everything of the main editing session that gets stashed while the blueprint editor is open. */
+export interface BlueprintEditStash {
+  network: RouteNetwork;
+  selection: Set<number>;
+  view: ViewTransform;
+  filePath?: string;
+  originalXml?: string;
+  dirty: boolean;
+  statusMessage: string;
+  history: { undo: Snapshot[]; redo: Snapshot[] };
+}
+
+export interface BlueprintEditSession {
+  /** index into blueprints, or null while creating a new one */
+  index: number | null;
+  name: string;
+  stash: BlueprintEditStash;
+}
+
 export interface EditorState {
   network: RouteNetwork;
   /** original XML text of the opened file (settings passthrough on save) */
@@ -35,11 +54,13 @@ export interface EditorState {
   pendingConnectFrom: number | null;
   placement: PendingPlacement | null;
   blueprints: Blueprint[];
+  /** non-null while the blueprint editor is open */
+  blueprintEdit: BlueprintEditSession | null;
   dirty: boolean;
   statusMessage: string;
 }
 
-interface Snapshot {
+export interface Snapshot {
   network: RouteNetwork;
   selection: Set<number>;
 }
@@ -71,6 +92,7 @@ export class EditorStore {
     pendingConnectFrom: null,
     placement: null,
     blueprints: [],
+    blueprintEdit: null,
     dirty: false,
     statusMessage: "Open an AutoDrive_config.xml or start placing nodes",
   };
@@ -131,6 +153,19 @@ export class EditorStore {
   clearHistory() {
     this.undoStack = [];
     this.redoStack = [];
+  }
+
+  /** Stash/restore undo history around the blueprint editor session. */
+  takeHistory(): { undo: Snapshot[]; redo: Snapshot[] } {
+    const h = { undo: this.undoStack, redo: this.redoStack };
+    this.undoStack = [];
+    this.redoStack = [];
+    return h;
+  }
+
+  restoreHistory(h: { undo: Snapshot[]; redo: Snapshot[] }) {
+    this.undoStack = h.undo;
+    this.redoStack = h.redo;
   }
 
   snap(v: number): number {
