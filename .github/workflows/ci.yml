@@ -11,10 +11,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  verify:
+    name: Format, lint, typecheck, test
     runs-on: ubuntu-latest
+    env:
+      # job-level so the Sonar steps can test for it in their `if` conditions
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Sonar needs full history to attribute issues to the right commits
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -24,9 +31,39 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck and build
-        run: npm run build
+      - name: Check formatting
+        run: npm run format:check
 
-      - name: Run model tests
-        # the tests drive a real browser; the runner ships Google Chrome
-        run: CHROMIUM_PATH="$(which google-chrome)" npm test
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests with coverage
+        run: npm run test:coverage
+
+      - name: UI smoke test
+        # drives the real app in the runner's Chrome
+        run: CHROMIUM_PATH="$(which google-chrome)" npm run test:ui
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+
+      # SonarQube Cloud analysis. Requires the SONAR_TOKEN repository secret;
+      # skipped automatically on forks and when the secret is not configured.
+      - name: SonarQube Cloud scan
+        id: sonar
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v6
+
+      # fails the build when the project's quality gate is red
+      - name: SonarQube quality gate
+        if: env.SONAR_TOKEN != '' && steps.sonar.outcome == 'success'
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5

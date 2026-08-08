@@ -171,7 +171,7 @@ export function connectAcrossGrid(
   ts.sort((p, q) => p - q);
   // merge crossings that coincide (diagonal through a grid corner)
   const merged: number[] = [];
-  const minStep = grid * 0.01 / Math.max(Math.hypot(dx, dz), 1e-9);
+  const minStep = (grid * 0.01) / Math.max(Math.hypot(dx, dz), 1e-9);
   for (const t of ts) {
     if (merged.length === 0 || t - merged[merged.length - 1] > minStep) merged.push(t);
   }

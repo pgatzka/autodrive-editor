@@ -218,22 +218,22 @@ ipcMain.handle("update:check", async (event, { token }) => {
     // version is then only in the release name
     const versionSource = !rawTag || /^untagged-/.test(rawTag) ? String(r.name || "") : rawTag;
     return {
-    tag: rawTag,
-    version: versionSource.replace(/^v/, ""),
-    name: r.name || r.tag_name,
-    draft: !!r.draft,
-    prerelease: !!r.prerelease,
-    createdAt: r.created_at,
-    publishedAt: r.published_at,
-    htmlUrl: r.html_url,
-    body: r.body || "",
-    assets: (r.assets || []).map((a) => ({
-      id: a.id,
-      name: a.name,
-      size: a.size,
-      // the asset API endpoint works for drafts (with token) and public releases alike
-      apiUrl: a.url,
-    })),
+      tag: rawTag,
+      version: versionSource.replace(/^v/, ""),
+      name: r.name || r.tag_name,
+      draft: !!r.draft,
+      prerelease: !!r.prerelease,
+      createdAt: r.created_at,
+      publishedAt: r.published_at,
+      htmlUrl: r.html_url,
+      body: r.body || "",
+      assets: (r.assets || []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        size: a.size,
+        // the asset API endpoint works for drafts (with token) and public releases alike
+        apiUrl: a.url,
+      })),
     };
   });
 });

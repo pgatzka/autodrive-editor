@@ -72,10 +72,12 @@ export interface Snapshot {
 
 function cloneNetwork(net: RouteNetwork): RouteNetwork {
   return {
-    waypoints: new Map(Array.from(net.waypoints.values(), (wp) => [
-      wp.id,
-      { ...wp, out: [...wp.out], incoming: [...wp.incoming] },
-    ])),
+    waypoints: new Map(
+      Array.from(net.waypoints.values(), (wp) => [
+        wp.id,
+        { ...wp, out: [...wp.out], incoming: [...wp.incoming] },
+      ])
+    ),
     markers: net.markers.map((m) => ({ ...m })),
     groups: [...net.groups],
     mapName: net.mapName,
@@ -129,7 +131,10 @@ export class EditorStore {
 
   /** Run a mutation that changes the network; records an undo snapshot. */
   mutate(fn: (s: EditorState) => void) {
-    this.undoStack.push({ network: cloneNetwork(this.state.network), selection: new Set(this.state.selection) });
+    this.undoStack.push({
+      network: cloneNetwork(this.state.network),
+      selection: new Set(this.state.selection),
+    });
     if (this.undoStack.length > MAX_UNDO) this.undoStack.shift();
     this.redoStack = [];
     fn(this.state);

@@ -26,33 +26,43 @@ export interface ReleaseInfo {
  * Returns negative / zero / positive like a sort comparator.
  */
 export function compareVersions(a: string, b: string): number {
-  const pa = parseVersion(a);
-  const pb = parseVersion(b);
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+
   for (let i = 0; i < 3; i++) {
-    if (pa.core[i] !== pb.core[i]) return pa.core[i] - pb.core[i];
+    if (left.core[i] !== right.core[i]) return left.core[i] - right.core[i];
   }
-  if (pa.pre.length === 0 && pb.pre.length === 0) return 0;
-  if (pa.pre.length === 0) return 1; // release > prerelease
-  if (pb.pre.length === 0) return -1;
-  const len = Math.max(pa.pre.length, pb.pre.length);
-  for (let i = 0; i < len; i++) {
-    const x = pa.pre[i];
-    const y = pb.pre[i];
-    if (x === undefined) return -1; // shorter prerelease list is lower
-    if (y === undefined) return 1;
-    const xn = /^\d+$/.test(x) ? Number(x) : null;
-    const yn = /^\d+$/.test(y) ? Number(y) : null;
-    if (xn !== null && yn !== null) {
-      if (xn !== yn) return xn - yn;
-    } else if (xn !== null) {
-      return -1; // numeric identifiers are lower than alphanumeric
-    } else if (yn !== null) {
-      return 1;
-    } else if (x !== y) {
-      return x < y ? -1 : 1;
-    }
+  return comparePrerelease(left.pre, right.pre);
+}
+
+/** A release outranks any of its prereleases; otherwise compare identifier by identifier. */
+function comparePrerelease(left: string[], right: string[]): number {
+  if (left.length === 0 && right.length === 0) return 0;
+  if (left.length === 0) return 1;
+  if (right.length === 0) return -1;
+
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    // a shorter identifier list ranks lower (1.0.0-alpha < 1.0.0-alpha.1)
+    if (i >= left.length) return -1;
+    if (i >= right.length) return 1;
+    const result = compareIdentifier(left[i], right[i]);
+    if (result !== 0) return result;
   }
   return 0;
+}
+
+function compareIdentifier(left: string, right: string): number {
+  const leftNumber = asNumber(left);
+  const rightNumber = asNumber(right);
+  // numeric identifiers always rank below alphanumeric ones
+  if (leftNumber !== null && rightNumber !== null) return leftNumber - rightNumber;
+  if (leftNumber !== null) return -1;
+  if (rightNumber !== null) return 1;
+  return left === right ? 0 : left < right ? -1 : 1;
+}
+
+function asNumber(identifier: string): number | null {
+  return /^\d+$/.test(identifier) ? Number(identifier) : null;
 }
 
 function parseVersion(v: string): { core: number[]; pre: string[] } {

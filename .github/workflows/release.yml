@@ -42,10 +42,14 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Typecheck and build
+      - name: Lint and typecheck
+        run: npm run lint && npm run typecheck
+      - name: Unit tests with coverage
+        run: npm run test:coverage
+      - name: UI smoke test
+        run: CHROMIUM_PATH="$(which google-chrome)" npm run test:ui
+      - name: Build renderer
         run: npm run build
-      - name: Run model tests
-        run: CHROMIUM_PATH="$(which google-chrome)" npm test
 
   prepare:
     name: Prepare draft release

@@ -132,15 +132,16 @@ export function blueprintToNetwork(bp: Blueprint): RouteNetwork {
   return net;
 }
 
-export function isBlueprint(v: unknown): v is Blueprint {
-  const b = v as Blueprint;
+/** Structural check for blueprints arriving from disk or another install. */
+export function isBlueprint(value: unknown): value is Blueprint {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
   return (
-    !!b &&
-    b.format === "autodrive-editor-blueprint" &&
-    Array.isArray(b.nodes) &&
-    Array.isArray(b.edges) &&
-    Array.isArray(b.markers) &&
-    typeof b.name === "string"
+    candidate.format === "autodrive-editor-blueprint" &&
+    typeof candidate.name === "string" &&
+    Array.isArray(candidate.nodes) &&
+    Array.isArray(candidate.edges) &&
+    Array.isArray(candidate.markers)
   );
 }
 

@@ -1,4 +1,5 @@
 import { buildBackground } from "../model/background";
+import { errorMessage } from "../model/errors";
 import { parseAutoDriveXml, serializeAutoDriveXml } from "../model/xml";
 import { bridge, store } from "../state/store";
 import { Blueprint } from "../model/types";
@@ -64,7 +65,7 @@ export async function loadBackgroundFrom(pathOrFolder: string, quiet: boolean) {
       s.statusMessage = `Background loaded: ${bg.mapTitle || "map"} (${bg.sizeMeters} m, ${bg.placeables.length} placeables, ${bg.vehicles.length} vehicles)`;
     });
   } catch (err) {
-    if (!quiet) store.update((s) => (s.statusMessage = `Background failed: ${err instanceof Error ? err.message : err}`));
+    if (!quiet) store.update((s) => (s.statusMessage = `Background failed: ${errorMessage(err)}`));
   }
 }
 
@@ -85,7 +86,7 @@ export async function openConfig() {
       // configs live inside the savegame folder — pick up the terrain background automatically
       void loadBackgroundFrom(result.path, true);
     } catch (err) {
-      store.update((s) => (s.statusMessage = `Open failed: ${err instanceof Error ? err.message : err}`));
+      store.update((s) => (s.statusMessage = `Open failed: ${errorMessage(err)}`));
     }
   } else {
     // browser fallback for `npm run dev` without electron
@@ -98,7 +99,7 @@ export async function openConfig() {
       try {
         applyOpenedXml(undefined, await file.text());
       } catch (err) {
-        store.update((s) => (s.statusMessage = `Open failed: ${err instanceof Error ? err.message : err}`));
+        store.update((s) => (s.statusMessage = `Open failed: ${errorMessage(err)}`));
       }
     };
     input.click();
@@ -111,7 +112,7 @@ export async function saveConfig(saveAs = false) {
   try {
     content = serializeAutoDriveXml(s.network, s.originalXml);
   } catch (err) {
-    store.update((st) => (st.statusMessage = `Save failed: ${err instanceof Error ? err.message : err}`));
+    store.update((st) => (st.statusMessage = `Save failed: ${errorMessage(err)}`));
     return;
   }
   const b = bridge();
@@ -145,7 +146,15 @@ export async function saveConfig(saveAs = false) {
 export function newConfig() {
   if (store.state.dirty && !window.confirm("Discard unsaved changes?")) return;
   store.update((s) => {
-    s.network = { waypoints: new Map(), markers: [], groups: ["All"], mapName: "", routeAuthor: "", routeVersion: "", nextId: 1 };
+    s.network = {
+      waypoints: new Map(),
+      markers: [],
+      groups: ["All"],
+      mapName: "",
+      routeAuthor: "",
+      routeVersion: "",
+      nextId: 1,
+    };
     s.originalXml = undefined;
     s.filePath = undefined;
     s.selection = new Set();
@@ -163,18 +172,19 @@ const LS_KEY = "autodrive-editor.blueprints";
 
 export async function loadBlueprintLibrary() {
   const b = bridge();
-  let raw: unknown[] = [];
-  if (b) {
-    raw = await b.loadBlueprints();
-  } else {
-    try {
-      raw = JSON.parse(localStorage.getItem(LS_KEY) ?? "[]");
-    } catch {
-      raw = [];
-    }
-  }
+  const raw = b ? await b.loadBlueprints() : parseJson(localStorage.getItem(LS_KEY));
   const blueprints = (Array.isArray(raw) ? raw : []).filter(isBlueprint);
   store.update((s) => (s.blueprints = blueprints));
+}
+
+/** JSON.parse that yields undefined instead of throwing on bad input. */
+function parseJson(text: string | null): unknown {
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function persistBlueprintLibrary() {
@@ -221,12 +231,8 @@ export async function importBlueprintFiles() {
       const files = Array.from(input.files ?? []);
       const valid: Blueprint[] = [];
       for (const f of files) {
-        try {
-          const parsed = JSON.parse(await f.text());
-          if (isBlueprint(parsed)) valid.push(parsed);
-        } catch {
-          // ignore unreadable file
-        }
+        const parsed = parseJson(await f.text());
+        if (isBlueprint(parsed)) valid.push(parsed);
       }
       store.update((s) => {
         s.blueprints = [...s.blueprints, ...valid];
