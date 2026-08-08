@@ -16,7 +16,7 @@ import { createViewport } from "./viewport";
 
 /** Records the drawing calls a scene makes, so layers can be asserted. */
 function recordingContext() {
-  const calls: { op: string; args: unknown[] }[] = [];
+  const calls: { op: string; args: unknown[]; smoothing?: boolean }[] = [];
   const styles: string[] = [];
   const dashes: number[][] = [];
   const context = {
@@ -51,7 +51,9 @@ function recordingContext() {
     },
     strokeRect: (...args: unknown[]) => calls.push({ op: "strokeRect", args }),
     fillText: (...args: unknown[]) => calls.push({ op: "fillText", args }),
-    drawImage: (...args: unknown[]) => calls.push({ op: "drawImage", args }),
+    drawImage: function (...args: unknown[]) {
+      calls.push({ op: "drawImage", args, smoothing: this.imageSmoothingEnabled });
+    },
   };
   return {
     ctx: context as unknown as CanvasRenderingContext2D,
@@ -60,6 +62,7 @@ function recordingContext() {
     dashes,
     ops: () => calls.map((call) => call.op),
     texts: () => calls.filter((call) => call.op === "fillText").map((call) => String(call.args[0])),
+    smoothingAt: (op: string) => calls.find((call) => call.op === op)?.smoothing,
     strokeWidths: (color: string) =>
       calls.filter((call) => call.op === "stroke" && call.args[0] === color).map((call) => call.args[1]),
   };
@@ -261,6 +264,34 @@ describe("renderScene", () => {
     expect(ops()).toContain("drawImage");
     expect(styles).toContain(CANVAS_COLORS.worldIcon);
     expect(texts()).toEqual(expect.arrayContaining(["silo", "tractor"]));
+  });
+
+  it("keeps terrain texels crisp when magnified and smooths them when minified", () => {
+    store.update((s) => {
+      s.background = {
+        canvas: { width: 4, height: 4 } as HTMLCanvasElement,
+        field: { samples: 2, sizeMeters: 1, values: new Uint16Array(4) },
+        sizeMeters: 100,
+        mapTitle: "Test",
+        placeables: [],
+        vehicles: [],
+        hasGroundTextures: true,
+      };
+    });
+
+    // one texel per metre: above 1 px/m a texel covers more than a pixel
+    const zoomedIn = recordingContext();
+    renderScene(zoomedIn.ctx, store.state, createViewport({ cx: 0, cz: 0, scale: 4 }, 800, 600), NO_OVERLAYS);
+    expect(zoomedIn.smoothingAt("drawImage")).toBe(false);
+
+    const zoomedOut = recordingContext();
+    renderScene(
+      zoomedOut.ctx,
+      store.state,
+      createViewport({ cx: 0, cz: 0, scale: 0.4 }, 800, 600),
+      NO_OVERLAYS
+    );
+    expect(zoomedOut.smoothingAt("drawImage")).toBe(true);
   });
 
   it("hides world icons when the setting is off", () => {

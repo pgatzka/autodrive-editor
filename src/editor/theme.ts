@@ -55,6 +55,13 @@ export const ZOOM = {
   ghostRotationCircle: 1,
 } as const;
 
+/**
+ * Terrain is one texel per metre: above this zoom a texel covers more than a
+ * pixel, so it is drawn with nearest-neighbour to keep the painted ground
+ * tiles crisp; below it, interpolation avoids aliasing.
+ */
+export const MIN_SMOOTHING_SCALE = 1;
+
 /** Grid lines are dropped when they would be denser than this. */
 export const MIN_GRID_SPACING_PX = 6;
 export const MAJOR_GRID_EVERY = 10;

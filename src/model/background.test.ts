@@ -80,17 +80,31 @@ describe("parseTerrainTypeCache", () => {
 });
 
 describe("buildTypePalette", () => {
-  it("gives the two dominant ground indices near-identical greens", () => {
-    const types = new Uint8Array([7, 9, 7, 9, 7, 9, 7, 3]);
+  it("merges the dithered pair of a surface into one tone", () => {
+    // the game alternates 16/17 for natural ground and 35/36 for a farmyard
+    const types = new Uint8Array([16, 17, 16, 17, 16, 17, 35, 36]);
 
     const palette = buildTypePalette(types);
 
-    const ground = palette.get(7)!;
-    const secondGround = palette.get(9)!;
-    const painted = palette.get(3)!;
-    expect(Math.abs(ground[1] - secondGround[1])).toBeLessThan(10);
-    expect(ground[1]).toBeGreaterThan(ground[0]); // green dominant
-    expect(painted).not.toEqual(ground);
+    expect(palette.get(16)).toEqual(palette.get(17));
+    expect(palette.get(35)).toEqual(palette.get(36));
+    expect(palette.get(35)).not.toEqual(palette.get(16));
+  });
+
+  it("gives the surface covering most of the map the grass tone", () => {
+    const types = new Uint8Array([16, 16, 16, 16, 16, 35, 35]);
+
+    const ground = buildTypePalette(types).get(16)!;
+
+    expect(ground[1]).toBeGreaterThan(ground[0]);
+    expect(ground[1]).toBeGreaterThan(ground[2]);
+  });
+
+  it("keeps surfaces apart when their indices are not adjacent", () => {
+    const palette = buildTypePalette(new Uint8Array([7, 7, 20, 40]));
+
+    expect(palette.get(20)).not.toEqual(palette.get(7));
+    expect(palette.get(40)).not.toEqual(palette.get(20));
   });
 });
 

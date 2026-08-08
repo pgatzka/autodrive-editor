@@ -5,10 +5,7 @@
  * cell per meter; the low byte is the terrain texture index.
  *
  * The index -> texture-name mapping lives in the map's i3d, which the
- * savegame doesn't carry, so display colors are assigned heuristically by
- * frequency: natural ground is a dithered pair of two dominant indices
- * (-> two near-identical greens that blend), painted areas (farmyards,
- * roads, dirt) are rarer and get distinct gravel/dirt/asphalt tones.
+ * savegame doesn't carry, so display colours are assigned heuristically.
  */
 
 export const TERRAIN_TYPE_MAGIC = 0x10dcac66;
@@ -40,14 +37,11 @@ export function parseTerrainTypeCache(bytes: Uint8Array): TerrainTypeLayer {
 
 export type Rgb = [number, number, number];
 
-// frequency rank 1+2: the dithered natural-ground pair; then painted surfaces
-const GROUND_PAIR: Rgb[] = [
-  [88, 118, 76],
-  [95, 125, 80],
-];
-const PAINTED: Rgb[] = [
+/** Surface tones, applied in order of how much of the map each surface covers. */
+const SURFACE_TONES: Rgb[] = [
+  [92, 122, 78], // grass / natural ground
   [150, 145, 138], // gravel
-  [170, 163, 144], // concrete / sand
+  [170, 163, 144], // concrete, sand
   [110, 91, 68], // dirt
   [98, 98, 104], // asphalt
   [154, 128, 86], // field ground
@@ -55,18 +49,50 @@ const PAINTED: Rgb[] = [
   [86, 108, 128], // water edge
   [140, 118, 140],
   [118, 140, 118],
-  [160, 140, 110],
 ];
 
-/** Deterministic display color per texture index, assigned by frequency rank. */
+/**
+ * A display colour per texture index.
+ *
+ * The game dithers a surface between neighbouring texture slots — natural
+ * ground alternates 16/17, a farmyard 35/36 — so colouring each index
+ * separately turns every surface into checkerboard noise once the view is
+ * zoomed in. Runs of consecutive indices are therefore treated as one
+ * surface and share a tone, which is also how they read in game.
+ */
 export function buildTypePalette(types: Uint8Array): Map<number, Rgb> {
-  const counts = new Map<number, number>();
-  for (const t of types) counts.set(t, (counts.get(t) ?? 0) + 1);
-  const ranked = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  const counts = countIndices(types);
+  const surfaces = groupConsecutive(Array.from(counts.keys()));
+
+  // biggest surface first, so the dominant ground gets the grass tone
+  surfaces.sort((a, b) => coverage(b, counts) - coverage(a, counts));
+
   const palette = new Map<number, Rgb>();
-  ranked.forEach(([type], rank) => {
-    if (rank < 2) palette.set(type, GROUND_PAIR[rank]);
-    else palette.set(type, PAINTED[(rank - 2) % PAINTED.length]);
+  surfaces.forEach((surface, rank) => {
+    const tone = SURFACE_TONES[rank % SURFACE_TONES.length];
+    for (const index of surface) palette.set(index, tone);
   });
   return palette;
+}
+
+function countIndices(types: Uint8Array): Map<number, number> {
+  const counts = new Map<number, number>();
+  for (const type of types) counts.set(type, (counts.get(type) ?? 0) + 1);
+  return counts;
+}
+
+/** [16, 17, 35, 36, 90] -> [[16, 17], [35, 36], [90]] */
+function groupConsecutive(indices: number[]): number[][] {
+  const sorted = indices.slice().sort((a, b) => a - b);
+  const groups: number[][] = [];
+  for (const index of sorted) {
+    const current = groups[groups.length - 1];
+    if (current && index - current[current.length - 1] === 1) current.push(index);
+    else groups.push([index]);
+  }
+  return groups;
+}
+
+function coverage(surface: number[], counts: Map<number, number>): number {
+  return surface.reduce((sum, index) => sum + (counts.get(index) ?? 0), 0);
 }

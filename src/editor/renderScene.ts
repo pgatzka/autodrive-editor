@@ -12,6 +12,7 @@ import {
   linkWidth,
   MAJOR_GRID_EVERY,
   MIN_GRID_SPACING_PX,
+  MIN_SMOOTHING_SCALE,
   nodeRadius,
   ZOOM,
 } from "./theme";
@@ -91,7 +92,10 @@ function drawTerrain(
 ): void {
   const half = background.sizeMeters / 2;
   ctx.globalAlpha = opacity;
-  ctx.imageSmoothingEnabled = true;
+  // The terrain raster is one texel per metre. Smoothing it while magnifying
+  // (scale > 1 px/m) blurs the painted tiles, so interpolate only when
+  // minifying, where it stops the ground dithering from aliasing.
+  ctx.imageSmoothingEnabled = viewport.scale < MIN_SMOOTHING_SCALE;
   ctx.drawImage(
     background.canvas,
     viewport.toScreenX(-half),
@@ -159,13 +163,6 @@ function drawLinks(ctx: CanvasRenderingContext2D, viewport: Viewport, state: Edi
     const condemned = doomed !== null && doomed.has(edge.from) && doomed.has(edge.to);
     drawLink(ctx, segment.a, segment.b, { kind: edge.kind, width, scale: viewport.scale, condemned });
   }
-}
-
-interface LinkStyle {
-  kind: ConnectionMode;
-  width: number;
-  scale: number;
-  condemned: boolean;
 }
 
 function drawLink(ctx: CanvasRenderingContext2D, a: ScreenPoint, b: ScreenPoint, style: LinkStyle): void {
@@ -261,13 +258,6 @@ function drawPendingConnection(
 }
 
 // ---------- nodes ----------
-
-interface NodeState {
-  selected: boolean;
-  condemned: boolean;
-  subprio: boolean;
-  pending: boolean;
-}
 
 function drawNodes(ctx: CanvasRenderingContext2D, viewport: Viewport, state: EditorState): void {
   const radius = nodeRadius(viewport.scale);
