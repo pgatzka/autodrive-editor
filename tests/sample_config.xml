@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<AutoDrive>
+    <version>3.0.1.2</version>
+    <MapName>MapUS</MapName>
+    <ADRouteVersion>1</ADRouteVersion>
+    <ADRouteAuthor>phil</ADRouteAuthor>
+    <autoConnectStart_userDefault>false</autoConnectStart_userDefault>
+    <experimentalFeatures>
+        <redLinePosition enabled="false"/>
+    </experimentalFeatures>
+    <waypoints>
+        <id>1,2,3,4,5,6</id>
+        <x>0,10,20,20,10,0</x>
+        <y>90,90.5,91,91,90.5,90</y>
+        <z>0,0,0,10,10,10</z>
+        <out>2;3;4;5;6,1;-1</out>
+        <incoming>-1;1;2;3;4;5</incoming>
+        <flags>0,0,1,1,0,0</flags>
+    </waypoints>
+    <mapmarker>
+        <mm1>
+            <id>1</id>
+            <name>Farm</name>
+            <group>All</group>
+        </mm1>
+        <mm2>
+            <id>4</id>
+            <name>Field 7</name>
+            <group>Fields</group>
+        </mm2>
+    </mapmarker>
+</AutoDrive>

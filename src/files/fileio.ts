@@ -1,0 +1,206 @@
+import { parseAutoDriveXml, serializeAutoDriveXml } from "../model/xml";
+import { bridge, store } from "../state/store";
+import { Blueprint } from "../model/types";
+import { isBlueprint } from "../model/blueprint";
+
+function fitViewToNetwork() {
+  const s = store.state;
+  const wps = Array.from(s.network.waypoints.values());
+  if (wps.length === 0) return;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const wp of wps) {
+    minX = Math.min(minX, wp.x);
+    maxX = Math.max(maxX, wp.x);
+    minZ = Math.min(minZ, wp.z);
+    maxZ = Math.max(maxZ, wp.z);
+  }
+  s.view.cx = (minX + maxX) / 2;
+  s.view.cz = (minZ + maxZ) / 2;
+  const spanX = Math.max(maxX - minX, 50);
+  const spanZ = Math.max(maxZ - minZ, 50);
+  const el = document.querySelector(".editor-canvas");
+  const w = el instanceof HTMLElement ? el.clientWidth : 1200;
+  const h = el instanceof HTMLElement ? el.clientHeight : 800;
+  s.view.scale = Math.min(w / spanX, h / spanZ) * 0.9;
+}
+
+function applyOpenedXml(path: string | undefined, content: string) {
+  const { network, originalText } = parseAutoDriveXml(content);
+  store.update((s) => {
+    s.network = network;
+    s.originalXml = originalText;
+    s.filePath = path;
+    s.selection = new Set();
+    s.pendingConnectFrom = null;
+    s.placement = null;
+    s.dirty = false;
+    s.statusMessage = `Loaded ${network.waypoints.size} waypoints, ${network.markers.length} markers`;
+  });
+  fitViewToNetwork();
+  store.clearHistory();
+  store.notify();
+}
+
+export async function openConfig() {
+  const b = bridge();
+  if (b) {
+    const result = await b.openXml();
+    if (!result) return;
+    try {
+      applyOpenedXml(result.path, result.content);
+    } catch (err) {
+      store.update((s) => (s.statusMessage = `Open failed: ${err instanceof Error ? err.message : err}`));
+    }
+  } else {
+    // browser fallback for `npm run dev` without electron
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".xml";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        applyOpenedXml(undefined, await file.text());
+      } catch (err) {
+        store.update((s) => (s.statusMessage = `Open failed: ${err instanceof Error ? err.message : err}`));
+      }
+    };
+    input.click();
+  }
+}
+
+export async function saveConfig(saveAs = false) {
+  const s = store.state;
+  let content: string;
+  try {
+    content = serializeAutoDriveXml(s.network, s.originalXml);
+  } catch (err) {
+    store.update((st) => (st.statusMessage = `Save failed: ${err instanceof Error ? err.message : err}`));
+    return;
+  }
+  const b = bridge();
+  if (b) {
+    if (s.filePath && !saveAs) {
+      await b.saveXmlTo(s.filePath, content);
+      store.update((st) => {
+        st.dirty = false;
+        st.statusMessage = `Saved ${st.network.waypoints.size} waypoints to ${s.filePath}`;
+      });
+    } else {
+      const result = await b.saveXml(s.filePath ?? "AutoDrive_config.xml", content);
+      if (!result) return;
+      store.update((st) => {
+        st.filePath = result.path;
+        st.dirty = false;
+        st.statusMessage = `Saved to ${result.path}`;
+      });
+    }
+  } else {
+    const blob = new Blob([content], { type: "application/xml" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "AutoDrive_config.xml";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    store.update((st) => (st.dirty = false));
+  }
+}
+
+export function newConfig() {
+  if (store.state.dirty && !window.confirm("Discard unsaved changes?")) return;
+  store.update((s) => {
+    s.network = { waypoints: new Map(), markers: [], groups: ["All"], mapName: "", routeAuthor: "", routeVersion: "", nextId: 1 };
+    s.originalXml = undefined;
+    s.filePath = undefined;
+    s.selection = new Set();
+    s.pendingConnectFrom = null;
+    s.placement = null;
+    s.dirty = false;
+    s.statusMessage = "New network";
+  });
+  store.clearHistory();
+}
+
+// ---- blueprint library persistence ----
+
+const LS_KEY = "autodrive-editor.blueprints";
+
+export async function loadBlueprintLibrary() {
+  const b = bridge();
+  let raw: unknown[] = [];
+  if (b) {
+    raw = await b.loadBlueprints();
+  } else {
+    try {
+      raw = JSON.parse(localStorage.getItem(LS_KEY) ?? "[]");
+    } catch {
+      raw = [];
+    }
+  }
+  const blueprints = (Array.isArray(raw) ? raw : []).filter(isBlueprint);
+  store.update((s) => (s.blueprints = blueprints));
+}
+
+export async function persistBlueprintLibrary() {
+  const blueprints = store.state.blueprints;
+  const b = bridge();
+  if (b) {
+    await b.storeBlueprints(blueprints);
+  } else {
+    localStorage.setItem(LS_KEY, JSON.stringify(blueprints));
+  }
+}
+
+export async function exportBlueprintFile(bp: Blueprint) {
+  const b = bridge();
+  if (b) {
+    await b.exportBlueprint(bp);
+  } else {
+    const blob = new Blob([JSON.stringify(bp, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${bp.name.replace(/[^\w\- ]+/g, "_")}.adbp.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+}
+
+export async function importBlueprintFiles() {
+  const b = bridge();
+  if (b) {
+    const imported = await b.importBlueprints();
+    if (!imported) return;
+    const valid = imported.filter(isBlueprint);
+    store.update((s) => {
+      s.blueprints = [...s.blueprints, ...valid];
+      s.statusMessage = `Imported ${valid.length} blueprint(s)`;
+    });
+    await persistBlueprintLibrary();
+  } else {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.multiple = true;
+    input.onchange = async () => {
+      const files = Array.from(input.files ?? []);
+      const valid: Blueprint[] = [];
+      for (const f of files) {
+        try {
+          const parsed = JSON.parse(await f.text());
+          if (isBlueprint(parsed)) valid.push(parsed);
+        } catch {
+          // ignore unreadable file
+        }
+      }
+      store.update((s) => {
+        s.blueprints = [...s.blueprints, ...valid];
+        s.statusMessage = `Imported ${valid.length} blueprint(s)`;
+      });
+      await persistBlueprintLibrary();
+    };
+    input.click();
+  }
+}
