@@ -41,6 +41,14 @@ describe("captureBlueprint", () => {
     expect(blueprint.markers).toEqual([]);
   });
 
+  it("uses a caller-supplied anchor instead of the centroid when given one", () => {
+    const blueprint = captureBlueprint(net, new Set(ids), "L shape", { x: 0, z: 0 })!;
+
+    // coordinates are now relative to the origin, not to the selection's centre
+    expect(blueprint.nodes[0]).toMatchObject({ x: -10, z: 0 });
+    expect(blueprint.nodes[2]).toMatchObject({ x: 0, z: 10 });
+  });
+
   it("returns null for an empty selection", () => {
     expect(captureBlueprint(net, new Set(), "nothing")).toBeNull();
   });

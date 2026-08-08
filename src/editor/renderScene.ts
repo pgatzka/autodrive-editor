@@ -1,6 +1,8 @@
 import { SavegameBackground } from "../model/background";
+import { firstLineAtOrAfter, Grid, isMajorLine } from "../model/grid";
 import { allEdges } from "../model/graph";
 import { ConnectionMode, FLAG_SUBPRIO, RouteNetwork } from "../model/types";
+import { BLUEPRINT_ORIGIN } from "../state/blueprintSession";
 import { EditorState } from "../state/store";
 import { fillCircle, ScreenPoint, strokeCircle, strokeLine } from "./canvasPrimitives";
 import { drawAnchor, drawGhost, drawMarkers, drawRubberBand, drawWorldIcons } from "./renderAnnotations";
@@ -64,19 +66,28 @@ export function renderScene(
   if (state.background && !blueprintMode) {
     drawTerrain(ctx, viewport, state.background, state.settings.backgroundOpacity);
   }
-  drawGrid(ctx, viewport, state.settings.gridSize, blueprintMode);
+  drawGrid(ctx, viewport, gridOf(state), blueprintMode);
   if (state.background && !blueprintMode && state.settings.showIcons) {
     drawWorldIcons(ctx, viewport, state.background);
   }
   drawLinks(ctx, viewport, state);
   drawPendingConnection(ctx, viewport, state, overlays.cursor);
-  if (blueprintMode) drawAnchor(ctx, viewport, state.network);
+  if (blueprintMode) drawAnchor(ctx, viewport, BLUEPRINT_ORIGIN);
   drawNodes(ctx, viewport, state);
   drawMarkers(ctx, viewport, state.network);
   if (state.placement && overlays.cursor) {
     drawGhost(ctx, viewport, state.placement.blueprint, state.placement.rotation, overlays.cursor);
   }
   if (overlays.marquee) drawRubberBand(ctx, overlays.marquee);
+}
+
+/** The grid the canvas draws, taken straight from settings. */
+function gridOf(state: EditorState): Grid {
+  return {
+    size: state.settings.gridSize,
+    offsetX: state.settings.gridOffsetX,
+    offsetZ: state.settings.gridOffsetZ,
+  };
 }
 
 function drawField(ctx: CanvasRenderingContext2D, viewport: Viewport, blueprintMode: boolean): void {
@@ -109,35 +120,32 @@ function drawTerrain(
 function drawGrid(
   ctx: CanvasRenderingContext2D,
   viewport: Viewport,
-  gridSize: number,
+  grid: Grid,
   blueprintMode: boolean
 ): void {
-  if (gridSize <= 0) return;
-  const minorVisible = gridSize * viewport.scale >= MIN_GRID_SPACING_PX;
-  const majorVisible = gridSize * viewport.scale * MAJOR_GRID_EVERY >= MIN_GRID_SPACING_PX;
+  if (grid.size <= 0) return;
+  const minorVisible = grid.size * viewport.scale >= MIN_GRID_SPACING_PX;
+  const majorVisible = grid.size * viewport.scale * MAJOR_GRID_EVERY >= MIN_GRID_SPACING_PX;
   if (!majorVisible) return;
 
   const minor = blueprintMode ? CANVAS_COLORS.gridMinorBlueprint : CANVAS_COLORS.gridMinor;
   const major = blueprintMode ? CANVAS_COLORS.gridMajorBlueprint : CANVAS_COLORS.gridMajor;
-  const step = minorVisible ? gridSize : gridSize * MAJOR_GRID_EVERY;
+  // when minor lines are too dense to read, only every tenth line is drawn
+  const step = minorVisible ? grid.size : grid.size * MAJOR_GRID_EVERY;
   ctx.lineWidth = 1;
 
-  const firstX = Math.floor(viewport.toWorldX(0) / step) * step;
-  for (let x = firstX; x <= viewport.toWorldX(viewport.width); x += step) {
-    ctx.strokeStyle = isMajor(x, gridSize) ? major : minor;
+  const maxX = viewport.toWorldX(viewport.width);
+  for (let x = firstLineAtOrAfter(viewport.toWorldX(0), step, grid.offsetX); x <= maxX; x += step) {
+    ctx.strokeStyle = isMajorLine(x, grid.size, grid.offsetX, MAJOR_GRID_EVERY) ? major : minor;
     const sx = Math.round(viewport.toScreenX(x)) + 0.5;
     strokeLine(ctx, sx, 0, sx, viewport.height);
   }
-  const firstZ = Math.floor(viewport.toWorldZ(0) / step) * step;
-  for (let z = firstZ; z <= viewport.toWorldZ(viewport.height); z += step) {
-    ctx.strokeStyle = isMajor(z, gridSize) ? major : minor;
+  const maxZ = viewport.toWorldZ(viewport.height);
+  for (let z = firstLineAtOrAfter(viewport.toWorldZ(0), step, grid.offsetZ); z <= maxZ; z += step) {
+    ctx.strokeStyle = isMajorLine(z, grid.size, grid.offsetZ, MAJOR_GRID_EVERY) ? major : minor;
     const sy = Math.round(viewport.toScreenY(z)) + 0.5;
     strokeLine(ctx, 0, sy, viewport.width, sy);
   }
-}
-
-function isMajor(coordinate: number, gridSize: number): boolean {
-  return Math.round(coordinate / gridSize) % MAJOR_GRID_EVERY === 0;
 }
 
 // ---------- links ----------

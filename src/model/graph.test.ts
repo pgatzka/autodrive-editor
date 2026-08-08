@@ -15,9 +15,15 @@ import {
   setFlagOn,
   smoothCurve,
 } from "./graph";
+import { Grid } from "./grid";
 import { emptyNetwork, FLAG_SUBPRIO, RouteNetwork } from "./types";
 
 let net: RouteNetwork;
+
+/** A grid aligned to the origin, unless a test says otherwise. */
+function grid(size: number, offsetX = 0, offsetZ = 0): Grid {
+  return { size, offsetX, offsetZ };
+}
 
 /** Chain of nodes along the x axis at 10 m spacing. */
 function addRow(count: number, spacing = 10): number[] {
@@ -100,7 +106,7 @@ describe("connectAcrossGrid", () => {
     const a = addWaypoint(net, 0, 0, 0).id;
     const b = addWaypoint(net, 10, 0, 0).id;
 
-    const created = connectAcrossGrid(net, a, b, 2, "oneway");
+    const created = connectAcrossGrid(net, a, b, grid(2), "oneway");
 
     expect(created.map((id) => net.waypoints.get(id)!.x)).toEqual([2, 4, 6, 8]);
     let current = a;
@@ -113,7 +119,7 @@ describe("connectAcrossGrid", () => {
   it("merges crossings that coincide on a diagonal", () => {
     const a = addWaypoint(net, 0, 0, 0).id;
     const b = addWaypoint(net, 10, 0, 10).id;
-    expect(connectAcrossGrid(net, a, b, 2, "dual")).toHaveLength(4);
+    expect(connectAcrossGrid(net, a, b, grid(2), "dual")).toHaveLength(4);
   });
 
   it("replaces an existing direct link", () => {
@@ -121,7 +127,7 @@ describe("connectAcrossGrid", () => {
     const b = addWaypoint(net, 10, 0, 0).id;
     connect(net, a, b, "oneway");
 
-    connectAcrossGrid(net, a, b, 2, "oneway");
+    connectAcrossGrid(net, a, b, grid(2), "oneway");
 
     expect(net.waypoints.get(a)!.out).not.toContain(b);
   });
@@ -129,15 +135,25 @@ describe("connectAcrossGrid", () => {
   it("interpolates height along the route", () => {
     const a = addWaypoint(net, 0, 100, 0).id;
     const b = addWaypoint(net, 10, 110, 0).id;
-    const created = connectAcrossGrid(net, a, b, 5, "oneway");
+    const created = connectAcrossGrid(net, a, b, grid(5), "oneway");
     expect(net.waypoints.get(created[0])!.y).toBeCloseTo(105);
+  });
+
+  it("puts the crossings on the offset grid", () => {
+    const a = addWaypoint(net, 0, 0, 0).id;
+    const b = addWaypoint(net, 10, 0, 0).id;
+
+    // lines at 1.5, 3.5, 5.5, ... rather than 2, 4, 6
+    const created = connectAcrossGrid(net, a, b, grid(2, 1.5), "oneway");
+
+    expect(created.map((id) => net.waypoints.get(id)!.x)).toEqual([1.5, 3.5, 5.5, 7.5, 9.5]);
   });
 
   it("does nothing for degenerate input", () => {
     const a = addWaypoint(net, 0, 0, 0).id;
-    expect(connectAcrossGrid(net, a, a, 2, "oneway")).toEqual([]);
-    expect(connectAcrossGrid(net, a, 999, 2, "oneway")).toEqual([]);
-    expect(connectAcrossGrid(net, a, a, 0, "oneway")).toEqual([]);
+    expect(connectAcrossGrid(net, a, a, grid(2), "oneway")).toEqual([]);
+    expect(connectAcrossGrid(net, a, 999, grid(2), "oneway")).toEqual([]);
+    expect(connectAcrossGrid(net, a, a, grid(0), "oneway")).toEqual([]);
   });
 });
 

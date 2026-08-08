@@ -15,6 +15,7 @@ import {
   setFlagOn,
   smoothCurve,
 } from "../model/graph";
+import { offsetForPosition } from "../model/grid";
 import { ConnectionMode } from "../model/types";
 import { closeDialog, confirmAction, showToast } from "./feedback";
 import { store } from "./store";
@@ -77,13 +78,7 @@ export function disconnectNodes(fromId: number, toId: number): void {
 /** Straight route between two nodes with a node at every grid crossing. */
 export function gridRoute(fromId: number, toId: number): void {
   store.mutate((s) => {
-    const created = connectAcrossGrid(
-      s.network,
-      fromId,
-      toId,
-      s.settings.gridSize,
-      s.settings.connectionMode
-    );
+    const created = connectAcrossGrid(s.network, fromId, toId, store.grid(), s.settings.connectionMode);
     s.statusMessage = `Grid route ${fromId} → ${toId}: ${created.length} nodes inserted`;
   });
 }
@@ -261,6 +256,26 @@ export function cancelCurrentInteraction(): void {
     } else {
       s.selection = new Set();
     }
+  });
+}
+
+/** Shift the grid so its lines cross this waypoint, then report the offsets. */
+export function alignGridToWaypoint(wpId: number): void {
+  store.update((s) => {
+    const waypoint = s.network.waypoints.get(wpId);
+    if (!waypoint) return;
+    const { offsetX, offsetZ } = offsetForPosition(waypoint.x, waypoint.z, s.settings.gridSize);
+    s.settings.gridOffsetX = offsetX;
+    s.settings.gridOffsetZ = offsetZ;
+    s.statusMessage = `Grid aligned to waypoint #${wpId} · offset ${offsetX} / ${offsetZ} m`;
+  });
+}
+
+export function resetGridOffset(): void {
+  store.update((s) => {
+    s.settings.gridOffsetX = 0;
+    s.settings.gridOffsetZ = 0;
+    s.statusMessage = "Grid offset reset";
   });
 }
 

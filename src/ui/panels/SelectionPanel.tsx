@@ -1,6 +1,8 @@
 import { connectionBetween } from "../../model/graph";
 import { FLAG_SUBPRIO, FLAG_TRAFFIC_SYSTEM, Waypoint } from "../../model/types";
+import { wrapOffset } from "../../model/grid";
 import {
+  alignGridToWaypoint,
   connectNodes,
   createSmoothCurve,
   disconnectNodes,
@@ -42,6 +44,7 @@ export function SelectionPanel() {
         <GroupIdentity selected={selected} />
       )}
       <Flags selected={selected} />
+      {selected.length === 1 && <GridAlignment waypoint={selected[0]} />}
       {selected.length === 1 && <MarkerEditor wpId={selected[0].id} />}
       <RouteTools selected={selected} />
     </>
@@ -101,6 +104,27 @@ function GroupIdentity({ selected }: { selected: Waypoint[] }) {
         </span>
         <span className="stat">{links} links</span>
       </div>
+    </Section>
+  );
+}
+
+/** Line the grid up with an existing waypoint, so snapping follows the road. */
+function GridAlignment({ waypoint }: { waypoint: Waypoint }) {
+  const state = useStore();
+  const aligned =
+    wrapOffset(waypoint.x, state.settings.gridSize) === state.settings.gridOffsetX &&
+    wrapOffset(waypoint.z, state.settings.gridSize) === state.settings.gridOffsetZ;
+
+  return (
+    <Section>
+      <Button
+        wide
+        disabled={aligned}
+        title="Shift the grid so its lines cross this waypoint"
+        onClick={() => alignGridToWaypoint(waypoint.id)}
+      >
+        {aligned ? "Grid aligned to this waypoint" : "Align grid to this waypoint"}
+      </Button>
     </Section>
   );
 }

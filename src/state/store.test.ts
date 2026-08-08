@@ -16,20 +16,36 @@ beforeEach(() => {
 
 describe("snap", () => {
   it("rounds to the nearest grid multiple when enabled", () => {
-    expect(store.snap(3.2)).toBe(4);
-    expect(store.snap(-3.2)).toBe(-4);
-    expect(store.snap(1)).toBe(2);
+    expect(store.snapX(3.2)).toBe(4);
+    expect(store.snapX(-3.2)).toBe(-4);
+    expect(store.snapX(1)).toBe(2);
+  });
+
+  it("snaps each axis to its own offset", () => {
+    store.update((s) => {
+      s.settings.gridOffsetX = 1.5;
+      s.settings.gridOffsetZ = 0.5;
+    });
+
+    expect(store.snapX(1.4)).toBe(1.5);
+    expect(store.snapZ(1.4)).toBe(0.5);
+
+    store.update((s) => {
+      s.settings.gridOffsetX = 0;
+      s.settings.gridOffsetZ = 0;
+    });
   });
 
   it("passes values through when snapping is off or the grid is degenerate", () => {
     store.update((s) => (s.settings.snapEnabled = false));
-    expect(store.snap(3.2)).toBe(3.2);
+    expect(store.snapX(3.2)).toBe(3.2);
 
     store.update((s) => {
       s.settings.snapEnabled = true;
       s.settings.gridSize = 0;
     });
-    expect(store.snap(3.2)).toBe(3.2);
+    expect(store.snapX(3.2)).toBe(3.2);
+    expect(store.snapZ(3.2)).toBe(3.2);
   });
 });
 

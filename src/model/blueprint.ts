@@ -1,66 +1,92 @@
 import { connect } from "./graph";
 import { Blueprint, emptyNetwork, RouteNetwork, Waypoint } from "./types";
 
-/** Capture the selected nodes (and the connections among them) as a reusable blueprint. */
-export function captureBlueprint(net: RouteNetwork, ids: Set<number>, name: string): Blueprint | null {
-  const nodes: Waypoint[] = [];
-  for (const id of ids) {
-    const wp = net.waypoints.get(id);
-    if (wp) nodes.push(wp);
-  }
+/**
+ * Capture the selected nodes (and the connections among them) as a reusable
+ * blueprint.
+ *
+ * Node coordinates are stored relative to an anchor — the point that lands
+ * under the cursor when the blueprint is stamped. Capturing from the map has
+ * no meaningful origin, so the anchor defaults to the centroid; the blueprint
+ * workspace passes its own fixed origin so the anchor never drifts as nodes
+ * are added.
+ */
+export function captureBlueprint(
+  net: RouteNetwork,
+  ids: Set<number>,
+  name: string,
+  anchor?: { x: number; z: number }
+): Blueprint | null {
+  const nodes = Array.from(ids)
+    .map((id) => net.waypoints.get(id))
+    .filter((wp): wp is Waypoint => wp !== undefined)
+    .sort((a, b) => a.id - b.id);
   if (nodes.length === 0) return null;
-  nodes.sort((a, b) => a.id - b.id);
 
-  let cx = 0;
-  let cy = 0;
-  let cz = 0;
-  for (const n of nodes) {
-    cx += n.x;
-    cy += n.y;
-    cz += n.z;
-  }
-  cx /= nodes.length;
-  cy /= nodes.length;
-  cz /= nodes.length;
+  const origin = captureOrigin(nodes, anchor);
+  const indexOf = new Map(nodes.map((node, index) => [node.id, index]));
 
-  const indexOf = new Map<number, number>();
-  nodes.forEach((n, i) => indexOf.set(n.id, i));
-
-  const bp: Blueprint = {
+  return {
     format: "autodrive-editor-blueprint",
     version: 1,
     name,
     nodes: nodes.map((n) => ({
-      x: round3(n.x - cx),
-      y: round3(n.y - cy),
-      z: round3(n.z - cz),
+      x: round3(n.x - origin.x),
+      y: round3(n.y - origin.y),
+      z: round3(n.z - origin.z),
       flags: n.flags,
     })),
-    edges: [],
-    markers: [],
+    edges: captureEdges(net, nodes, indexOf),
+    markers: net.markers
+      .filter((marker) => indexOf.has(marker.wpId))
+      .map((marker) => ({ node: indexOf.get(marker.wpId)!, name: marker.name, group: marker.group })),
   };
+}
 
-  for (const n of nodes) {
-    for (const toId of n.out) {
+/**
+ * Heights always stay relative to the mean, since stamping re-bases them on
+ * the terrain; only the horizontal anchor is caller-controlled.
+ */
+function captureOrigin(
+  nodes: Waypoint[],
+  anchor?: { x: number; z: number }
+): { x: number; y: number; z: number } {
+  let cx = 0;
+  let cy = 0;
+  let cz = 0;
+  for (const node of nodes) {
+    cx += node.x;
+    cy += node.y;
+    cz += node.z;
+  }
+  return {
+    x: anchor ? anchor.x : cx / nodes.length,
+    y: cy / nodes.length,
+    z: anchor ? anchor.z : cz / nodes.length,
+  };
+}
+
+/** Connections among the captured nodes, dual links emitted once. */
+function captureEdges(
+  net: RouteNetwork,
+  nodes: Waypoint[],
+  indexOf: Map<number, number>
+): Blueprint["edges"] {
+  const edges: Blueprint["edges"] = [];
+  for (const node of nodes) {
+    for (const toId of node.out) {
       if (!indexOf.has(toId)) continue;
       const to = net.waypoints.get(toId)!;
-      const dual = to.out.includes(n.id);
-      if (dual && toId < n.id) continue;
-      bp.edges.push({
-        from: indexOf.get(n.id)!,
+      const dual = to.out.includes(node.id);
+      if (dual && toId < node.id) continue;
+      edges.push({
+        from: indexOf.get(node.id)!,
         to: indexOf.get(toId)!,
-        kind: dual ? "dual" : to.incoming.includes(n.id) ? "oneway" : "reverse",
+        kind: dual ? "dual" : to.incoming.includes(node.id) ? "oneway" : "reverse",
       });
     }
   }
-
-  for (const m of net.markers) {
-    if (indexOf.has(m.wpId)) {
-      bp.markers.push({ node: indexOf.get(m.wpId)!, name: m.name, group: m.group });
-    }
-  }
-
-  return bp;
+  return edges;
 }
 
 export interface Placement {

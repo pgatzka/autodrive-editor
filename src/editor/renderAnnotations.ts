@@ -1,6 +1,11 @@
 import { SavegameBackground } from "../model/background";
 import { placedPositions } from "../model/blueprint";
 import { Blueprint, RouteNetwork } from "../model/types";
+
+interface WorldPoint {
+  x: number;
+  z: number;
+}
 import {
   drawCrosshair,
   fillCircle,
@@ -125,20 +130,14 @@ export function drawGhost(
   ctx.globalAlpha = 1;
 }
 
-/** Marks the blueprint origin — the point that lands under the cursor. */
-export function drawAnchor(ctx: CanvasRenderingContext2D, viewport: Viewport, network: RouteNetwork): void {
-  let x = 0;
-  let z = 0;
-  if (network.waypoints.size > 0) {
-    for (const waypoint of network.waypoints.values()) {
-      x += waypoint.x;
-      z += waypoint.z;
-    }
-    x /= network.waypoints.size;
-    z /= network.waypoints.size;
-  }
-  const sx = viewport.toScreenX(x);
-  const sy = viewport.toScreenY(z);
+/**
+ * Marks the blueprint anchor — the point that lands under the cursor when the
+ * blueprint is stamped. It is the fixed workspace origin, so it does not drift
+ * as nodes are added or moved.
+ */
+export function drawAnchor(ctx: CanvasRenderingContext2D, viewport: Viewport, anchor: WorldPoint): void {
+  const sx = viewport.toScreenX(anchor.x);
+  const sy = viewport.toScreenY(anchor.z);
 
   ctx.strokeStyle = CANVAS_COLORS.blueprint;
   ctx.lineWidth = 1.25;

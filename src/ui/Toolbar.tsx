@@ -1,3 +1,4 @@
+import { wrapOffset } from "../model/grid";
 import { ConnectionMode } from "../model/types";
 import { setShortcutsOpen } from "../state/feedback";
 import { store, Tool } from "../state/store";
@@ -90,6 +91,16 @@ export function Toolbar() {
             store.update((s) => (s.settings.gridSize = stepGrid(s.settings.gridSize, direction)))
           }
         />
+        <OffsetField
+          axis="X"
+          value={state.settings.gridOffsetX}
+          onChange={(value) => store.update((s) => (s.settings.gridOffsetX = value))}
+        />
+        <OffsetField
+          axis="Z"
+          value={state.settings.gridOffsetZ}
+          onChange={(value) => store.update((s) => (s.settings.gridOffsetZ = value))}
+        />
         <button
           className={cx("snap-toggle", state.settings.snapEnabled && "on")}
           title="Snap waypoints to the grid (G)"
@@ -120,6 +131,38 @@ export function Toolbar() {
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Grid offset on one axis. Existing roads rarely sit on the origin-aligned
+ * grid, so shifting it is what makes snapping usable on a real map.
+ */
+function OffsetField({
+  axis,
+  value,
+  onChange,
+}: {
+  axis: "X" | "Z";
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const state = useStore();
+  return (
+    <label className="offset-field" title={`Shift the grid along ${axis} (0 – ${state.settings.gridSize} m)`}>
+      <span className="axis">{axis}</span>
+      <input
+        className="input mono"
+        type="number"
+        step={0.5}
+        value={value}
+        aria-label={`Grid offset ${axis}`}
+        onChange={(event) => {
+          const parsed = Number(event.target.value);
+          if (Number.isFinite(parsed)) onChange(wrapOffset(parsed, state.settings.gridSize));
+        }}
+      />
+    </label>
   );
 }
 

@@ -401,7 +401,17 @@
 <a name='L336'></a><a href='#L336'>336</a>
 <a name='L337'></a><a href='#L337'>337</a>
 <a name='L338'></a><a href='#L338'>338</a>
-<a name='L339'></a><a href='#L339'>339</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L339'></a><a href='#L339'>339</a>
+<a name='L340'></a><a href='#L340'>340</a>
+<a name='L341'></a><a href='#L341'>341</a>
+<a name='L342'></a><a href='#L342'>342</a>
+<a name='L343'></a><a href='#L343'>343</a>
+<a name='L344'></a><a href='#L344'>344</a>
+<a name='L345'></a><a href='#L345'>345</a>
+<a name='L346'></a><a href='#L346'>346</a>
+<a name='L347'></a><a href='#L347'>347</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -483,6 +493,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">19x</span>
 <span class="cline-any cline-yes">19x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -522,25 +541,22 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">17x</span>
 <span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">19x</span>
 <span class="cline-any cline-yes">19x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">19x</span>
 <span class="cline-any cline-yes">19x</span>
-<span class="cline-any cline-yes">1624x</span>
-<span class="cline-any cline-yes">1624x</span>
-<span class="cline-any cline-yes">1624x</span>
+<span class="cline-any cline-yes">1621x</span>
+<span class="cline-any cline-yes">1621x</span>
+<span class="cline-any cline-yes">1621x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">17x</span>
 <span class="cline-any cline-yes">17x</span>
-<span class="cline-any cline-yes">1222x</span>
-<span class="cline-any cline-yes">1222x</span>
-<span class="cline-any cline-yes">1222x</span>
+<span class="cline-any cline-yes">1209x</span>
+<span class="cline-any cline-yes">1209x</span>
+<span class="cline-any cline-yes">1209x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2846x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -740,8 +756,10 @@
 <span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { SavegameBackground } from "../model/background";
+import { firstLineAtOrAfter, Grid, isMajorLine } from "../model/grid";
 import { allEdges } from "../model/graph";
 import { ConnectionMode, FLAG_SUBPRIO, RouteNetwork } from "../model/types";
+import { BLUEPRINT_ORIGIN } from "../state/blueprintSession";
 import { EditorState } from "../state/store";
 import { fillCircle, ScreenPoint, strokeCircle, strokeLine } from "./canvasPrimitives";
 import { drawAnchor, drawGhost, drawMarkers, drawRubberBand, drawWorldIcons } from "./renderAnnotations";
@@ -805,19 +823,28 @@ export function renderScene(
   if (state.background &amp;&amp; !blueprintMode) {
     drawTerrain(ctx, viewport, state.background, state.settings.backgroundOpacity);
   }
-  drawGrid(ctx, viewport, state.settings.gridSize, blueprintMode);
+  drawGrid(ctx, viewport, gridOf(state), blueprintMode);
   if (state.background &amp;&amp; !blueprintMode &amp;&amp; state.settings.showIcons) {
     drawWorldIcons(ctx, viewport, state.background);
   }
   drawLinks(ctx, viewport, state);
   drawPendingConnection(ctx, viewport, state, overlays.cursor);
-  if (blueprintMode) drawAnchor(ctx, viewport, state.network);
+  if (blueprintMode) drawAnchor(ctx, viewport, BLUEPRINT_ORIGIN);
   drawNodes(ctx, viewport, state);
   drawMarkers(ctx, viewport, state.network);
   if (state.placement &amp;&amp; overlays.cursor) {
     drawGhost(ctx, viewport, state.placement.blueprint, state.placement.rotation, overlays.cursor);
   }
   if (overlays.marquee) drawRubberBand(ctx, overlays.marquee);
+}
+&nbsp;
+/** The grid the canvas draws, taken straight from settings. */
+function gridOf(state: EditorState): Grid {
+  return {
+    size: state.settings.gridSize,
+    offsetX: state.settings.gridOffsetX,
+    offsetZ: state.settings.gridOffsetZ,
+  };
 }
 &nbsp;
 function drawField(ctx: CanvasRenderingContext2D, viewport: Viewport, blueprintMode: boolean): void {
@@ -850,35 +877,32 @@ function drawTerrain(
 function drawGrid(
   ctx: CanvasRenderingContext2D,
   viewport: Viewport,
-  gridSize: number,
+  grid: Grid,
   blueprintMode: boolean
 ): void {
-  if (gridSize &lt;= 0) return;
-  const minorVisible = gridSize * viewport.scale &gt;= MIN_GRID_SPACING_PX;
-  const majorVisible = gridSize * viewport.scale * MAJOR_GRID_EVERY &gt;= MIN_GRID_SPACING_PX;
+  if (grid.size &lt;= 0) return;
+  const minorVisible = grid.size * viewport.scale &gt;= MIN_GRID_SPACING_PX;
+  const majorVisible = grid.size * viewport.scale * MAJOR_GRID_EVERY &gt;= MIN_GRID_SPACING_PX;
   if (!majorVisible) return;
 &nbsp;
   const minor = blueprintMode ? CANVAS_COLORS.gridMinorBlueprint : CANVAS_COLORS.gridMinor;
   const major = blueprintMode ? CANVAS_COLORS.gridMajorBlueprint : CANVAS_COLORS.gridMajor;
-  const step = minorVisible ? gridSize : gridSize * MAJOR_GRID_EVERY;
+  // when minor lines are too dense to read, only every tenth line is drawn
+  const step = minorVisible ? grid.size : grid.size * MAJOR_GRID_EVERY;
   ctx.lineWidth = 1;
 &nbsp;
-  const firstX = Math.floor(viewport.toWorldX(0) / step) * step;
-  for (let x = firstX; x &lt;= viewport.toWorldX(viewport.width); x += step) {
-    ctx.strokeStyle = isMajor(x, gridSize) ? major : minor;
+  const maxX = viewport.toWorldX(viewport.width);
+  for (let x = firstLineAtOrAfter(viewport.toWorldX(0), step, grid.offsetX); x &lt;= maxX; x += step) {
+    ctx.strokeStyle = isMajorLine(x, grid.size, grid.offsetX, MAJOR_GRID_EVERY) ? major : minor;
     const sx = Math.round(viewport.toScreenX(x)) + 0.5;
     strokeLine(ctx, sx, 0, sx, viewport.height);
   }
-  const firstZ = Math.floor(viewport.toWorldZ(0) / step) * step;
-  for (let z = firstZ; z &lt;= viewport.toWorldZ(viewport.height); z += step) {
-    ctx.strokeStyle = isMajor(z, gridSize) ? major : minor;
+  const maxZ = viewport.toWorldZ(viewport.height);
+  for (let z = firstLineAtOrAfter(viewport.toWorldZ(0), step, grid.offsetZ); z &lt;= maxZ; z += step) {
+    ctx.strokeStyle = isMajorLine(z, grid.size, grid.offsetZ, MAJOR_GRID_EVERY) ? major : minor;
     const sy = Math.round(viewport.toScreenY(z)) + 0.5;
     strokeLine(ctx, 0, sy, viewport.width, sy);
   }
-}
-&nbsp;
-function isMajor(coordinate: number, gridSize: number): boolean {
-  return Math.round(coordinate / gridSize) % MAJOR_GRID_EVERY === 0;
 }
 &nbsp;
 // ---------- links ----------
@@ -1084,7 +1108,7 @@ function screenSegment(
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-08T21:14:32.341Z
+                at 2026-08-08T21:47:01.042Z
             </div>
         <script src="../prettify.js"></script>
         <script>

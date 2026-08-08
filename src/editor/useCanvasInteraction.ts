@@ -75,7 +75,7 @@ export function useCanvasInteraction(
       const viewport = createViewport(store.state.view, rect.width, rect.height);
       const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
       const world = { x: viewport.toWorldX(screen.x), z: viewport.toWorldZ(screen.y) };
-      return { viewport, screen, world, snapped: { x: store.snap(world.x), z: store.snap(world.z) } };
+      return { viewport, screen, world, snapped: { x: store.snapX(world.x), z: store.snapZ(world.z) } };
     },
     [canvasRef]
   );
@@ -217,8 +217,8 @@ function advanceDrag(drag: Drag, hit: PointerHit, marqueeRef: MutableRefObject<M
     const grabbed = drag.origins.get(drag.grabbedId);
     if (!grabbed) return;
     // snap the grabbed node; the rest of the selection follows rigidly
-    const snappedDX = store.snap(grabbed.x + dx) - grabbed.x;
-    const snappedDZ = store.snap(grabbed.z + dz) - grabbed.z;
+    const snappedDX = store.snapX(grabbed.x + dx) - grabbed.x;
+    const snappedDZ = store.snapZ(grabbed.z + dz) - grabbed.z;
     drag.moved = drag.moved || Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01;
     applyPositions(offsetPositions(drag.origins, snappedDX, snappedDZ));
     return;

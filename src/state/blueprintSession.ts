@@ -3,6 +3,9 @@ import { blueprintToNetwork, captureBlueprint } from "../model/blueprint";
 import { emptyNetwork } from "../model/types";
 import { store } from "./store";
 
+/** The blueprint workspace is centred on the origin, which is also its anchor. */
+export const BLUEPRINT_ORIGIN = { x: 0, z: 0 };
+
 /**
  * The blueprint editor reuses the whole main editor: the current session
  * (network, selection, view, undo history) is stashed, the canvas edits the
@@ -49,7 +52,8 @@ export function saveBlueprintEditor(close: boolean): boolean {
     return false;
   }
   const name = session.name.trim() || "Unnamed";
-  const bp = captureBlueprint(s.network, new Set(s.network.waypoints.keys()), name);
+  // the workspace origin is the anchor, so it stays put while the blueprint grows
+  const bp = captureBlueprint(s.network, new Set(s.network.waypoints.keys()), name, BLUEPRINT_ORIGIN);
   if (!bp) return false;
   store.update((st) => {
     if (session.index === null) {

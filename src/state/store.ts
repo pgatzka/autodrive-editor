@@ -1,4 +1,5 @@
 import { SavegameBackground } from "../model/background";
+import { Grid, snapTo } from "../model/grid";
 import { Blueprint, ConnectionMode, RouteNetwork, emptyNetwork } from "../model/types";
 
 export type Tool = "select" | "add" | "connect" | "gridroute" | "place";
@@ -36,6 +37,9 @@ export interface ConfirmDialog {
 
 export interface EditorSettings {
   gridSize: number;
+  /** grid origin shift, so the grid can line up with what is already on the map */
+  gridOffsetX: number;
+  gridOffsetZ: number;
   snapEnabled: boolean;
   connectionMode: ConnectionMode;
   curveSegments: number;
@@ -127,6 +131,8 @@ export class EditorStore {
     tool: "select",
     settings: {
       gridSize: 2,
+      gridOffsetX: 0,
+      gridOffsetZ: 0,
       snapEnabled: true,
       connectionMode: "oneway",
       curveSegments: 6,
@@ -221,10 +227,20 @@ export class EditorStore {
     this.redoStack = h.redo;
   }
 
-  snap(v: number): number {
-    const { gridSize, snapEnabled } = this.state.settings;
-    if (!snapEnabled || gridSize <= 0) return v;
-    return Math.round(v / gridSize) * gridSize;
+  /** The active grid, or a disabled one while snapping is off. */
+  grid(): Grid {
+    const { gridSize, gridOffsetX, gridOffsetZ } = this.state.settings;
+    return { size: gridSize, offsetX: gridOffsetX, offsetZ: gridOffsetZ };
+  }
+
+  snapX(value: number): number {
+    const { gridSize, gridOffsetX, snapEnabled } = this.state.settings;
+    return snapEnabled ? snapTo(value, gridSize, gridOffsetX) : value;
+  }
+
+  snapZ(value: number): number {
+    const { gridSize, gridOffsetZ, snapEnabled } = this.state.settings;
+    return snapEnabled ? snapTo(value, gridSize, gridOffsetZ) : value;
   }
 }
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { placedPositions } from "../model/blueprint";
 import { addWaypoint, connect } from "../model/graph";
 import { emptyNetwork } from "../model/types";
 import { discardBlueprintEditor, enterBlueprintEditor, saveBlueprintEditor } from "./blueprintSession";
@@ -117,6 +118,41 @@ describe("saveBlueprintEditor", () => {
 
   it("does nothing when the workspace is closed", () => {
     expect(saveBlueprintEditor(false)).toBe(false);
+  });
+});
+
+describe("the workspace anchor", () => {
+  it("stays at the origin as the blueprint grows", () => {
+    enterBlueprintEditor(null);
+    store.mutate((s) => {
+      addWaypoint(s.network, 10, 0, 0);
+    });
+    saveBlueprintEditor(false);
+    const firstNode = store.state.blueprints[0].nodes[0];
+
+    // adding a node far off to one side must not drag the anchor with it
+    store.mutate((s) => {
+      addWaypoint(s.network, 200, 0, 200);
+    });
+    saveBlueprintEditor(false);
+
+    expect(store.state.blueprints[0].nodes[0]).toEqual(firstNode);
+  });
+
+  it("keeps stamping predictable: the origin lands under the cursor", () => {
+    enterBlueprintEditor(null);
+    store.mutate((s) => {
+      addWaypoint(s.network, 4, 0, 0);
+      addWaypoint(s.network, 20, 0, 0);
+    });
+    saveBlueprintEditor(true);
+
+    const blueprint = store.state.blueprints[0];
+    const positions = placedPositions(blueprint, { x: 100, z: 50, rotation: 0 });
+
+    // node offsets are measured from the origin, not from their own centre
+    expect(positions[0]).toEqual({ x: 104, z: 50 });
+    expect(positions[1]).toEqual({ x: 120, z: 50 });
   });
 });
 

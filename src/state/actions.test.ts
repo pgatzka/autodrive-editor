@@ -4,6 +4,7 @@ import { captureBlueprint } from "../model/blueprint";
 import { emptyNetwork, FLAG_SUBPRIO } from "../model/types";
 import {
   addNode,
+  alignGridToWaypoint,
   cancelCurrentInteraction,
   commitMove,
   connectOrCycle,
@@ -12,6 +13,7 @@ import {
   focusOnWaypoint,
   gridRoute,
   insertMidpointBetween,
+  resetGridOffset,
   selectAll,
   setSelection,
   setSelectionFlag,
@@ -31,6 +33,9 @@ beforeEach(() => {
     s.pendingConnectFrom = null;
     s.tool = "select";
     s.settings.gridSize = 2;
+    s.settings.gridOffsetX = 0;
+    s.settings.gridOffsetZ = 0;
+    s.settings.snapEnabled = true;
     s.settings.connectionMode = "oneway";
     s.settings.curveSegments = 6;
   });
@@ -204,6 +209,34 @@ describe("cancelCurrentInteraction", () => {
 
     cancelCurrentInteraction();
     expect(store.state.selection.size).toBe(0);
+  });
+});
+
+describe("grid alignment", () => {
+  it("shifts the grid so its lines cross the waypoint", () => {
+    const id = addNode(123.4, -57.9, null, "oneway");
+    store.update((s) => (s.settings.gridSize = 2));
+
+    alignGridToWaypoint(id);
+
+    const waypoint = store.state.network.waypoints.get(id)!;
+    expect(store.snapX(waypoint.x)).toBeCloseTo(waypoint.x);
+    expect(store.snapZ(waypoint.z)).toBeCloseTo(waypoint.z);
+    expect(store.state.statusMessage).toContain("aligned");
+  });
+
+  it("ignores an unknown waypoint and resets on request", () => {
+    store.update((s) => {
+      s.settings.gridOffsetX = 1.5;
+      s.settings.gridOffsetZ = 0.5;
+    });
+
+    alignGridToWaypoint(999);
+    expect(store.state.settings.gridOffsetX).toBe(1.5);
+
+    resetGridOffset();
+    expect(store.state.settings.gridOffsetX).toBe(0);
+    expect(store.state.settings.gridOffsetZ).toBe(0);
   });
 });
 

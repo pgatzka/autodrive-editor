@@ -1,3 +1,4 @@
+import { Grid } from "./grid";
 import { ConnectionMode, Edge, RouteNetwork, Waypoint } from "./types";
 
 function pushUnique(arr: number[], v: number) {
@@ -177,20 +178,21 @@ export function estimateY(net: RouteNetwork, x: number, z: number): number {
 
 /**
  * Connect a -> b in a straight line, creating a node at every crossing of a
- * grid line (both vertical x = k*grid and horizontal z = m*grid lines).
- * Consecutive nodes are linked with `mode`. Heights are interpolated.
+ * grid line on either axis. Consecutive nodes are linked with `mode` and
+ * heights are interpolated. The grid's offset is honoured, so the inserted
+ * nodes land on the same lines the canvas draws.
  * Returns the ids of the created intermediate nodes.
  */
 export function connectAcrossGrid(
   net: RouteNetwork,
   aId: number,
   bId: number,
-  grid: number,
+  grid: Grid,
   mode: ConnectionMode
 ): number[] {
   const a = net.waypoints.get(aId);
   const b = net.waypoints.get(bId);
-  if (!a || !b || aId === bId || grid <= 0) return [];
+  if (!a || !b || aId === bId || grid.size <= 0) return [];
 
   // the subdivided route replaces any existing direct link
   disconnect(net, aId, bId);
@@ -199,23 +201,23 @@ export function connectAcrossGrid(
   const dz = b.z - a.z;
   const ts: number[] = [];
 
-  const crossings = (from: number, delta: number) => {
+  const crossings = (from: number, delta: number, offset: number) => {
     if (Math.abs(delta) < 1e-9) return;
     const to = from + delta;
-    const first = Math.ceil(Math.min(from, to) / grid);
-    const last = Math.floor(Math.max(from, to) / grid);
+    const first = Math.ceil((Math.min(from, to) - offset) / grid.size);
+    const last = Math.floor((Math.max(from, to) - offset) / grid.size);
     for (let k = first; k <= last; k++) {
-      const t = (k * grid - from) / delta;
+      const t = (k * grid.size + offset - from) / delta;
       if (t > 1e-6 && t < 1 - 1e-6) ts.push(t);
     }
   };
-  crossings(a.x, dx);
-  crossings(a.z, dz);
+  crossings(a.x, dx, grid.offsetX);
+  crossings(a.z, dz, grid.offsetZ);
 
   ts.sort((p, q) => p - q);
   // merge crossings that coincide (diagonal through a grid corner)
   const merged: number[] = [];
-  const minStep = (grid * 0.01) / Math.max(Math.hypot(dx, dz), 1e-9);
+  const minStep = (grid.size * 0.01) / Math.max(Math.hypot(dx, dz), 1e-9);
   for (const t of ts) {
     if (merged.length === 0 || t - merged[merged.length - 1] > minStep) merged.push(t);
   }

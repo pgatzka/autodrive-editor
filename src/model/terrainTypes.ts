@@ -86,7 +86,7 @@ function groupConsecutive(indices: number[]): number[][] {
   const sorted = indices.slice().sort((a, b) => a - b);
   const groups: number[][] = [];
   for (const index of sorted) {
-    const current = groups[groups.length - 1];
+    const current = groups.length > 0 ? groups[groups.length - 1] : null;
     if (current && index - current[current.length - 1] === 1) current.push(index);
     else groups.push([index]);
   }
