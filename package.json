@@ -4,6 +4,10 @@
   "description": "Desktop route network editor for the FS25 AutoDrive mod",
   "author": "Phil Gatzka",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pgatzka/autodrive-editor.git"
+  },
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
@@ -39,6 +43,12 @@
     ],
     "directories": {
       "output": "release"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "pgatzka",
+      "repo": "autodrive-editor",
+      "releaseType": "draft"
     },
     "win": {
       "target": "nsis"

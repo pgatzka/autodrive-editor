@@ -152,6 +152,13 @@ export interface AdBridge {
   storeBlueprints(blueprints: Blueprint[]): Promise<boolean>;
   exportBlueprint(blueprint: Blueprint): Promise<{ path: string } | null>;
   importBlueprints(): Promise<unknown[] | null>;
+  loadSettings(): Promise<Record<string, unknown>>;
+  saveSettings(settings: Record<string, unknown>): Promise<boolean>;
+  getVersion(): Promise<string>;
+  checkUpdates(token: string | undefined): Promise<unknown[]>;
+  downloadUpdate(asset: unknown, token: string | undefined): Promise<{ path: string; launched: boolean }>;
+  openReleasePage(url: string): Promise<void>;
+  platform: string;
 }
 
 export function bridge(): AdBridge | null {

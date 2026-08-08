@@ -8,4 +8,11 @@ contextBridge.exposeInMainWorld("adBridge", {
   storeBlueprints: (blueprints) => ipcRenderer.invoke("blueprints:store", blueprints),
   exportBlueprint: (blueprint) => ipcRenderer.invoke("blueprints:export", blueprint),
   importBlueprints: () => ipcRenderer.invoke("blueprints:import"),
+  loadSettings: () => ipcRenderer.invoke("settings:load"),
+  saveSettings: (settings) => ipcRenderer.invoke("settings:save", settings),
+  getVersion: () => ipcRenderer.invoke("app:version"),
+  checkUpdates: (token) => ipcRenderer.invoke("update:check", { token }),
+  downloadUpdate: (asset, token) => ipcRenderer.invoke("update:download", { asset, token }),
+  openReleasePage: (url) => ipcRenderer.invoke("update:openUrl", url),
+  platform: process.platform,
 });

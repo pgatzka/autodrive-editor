@@ -1,5 +1,8 @@
 # AutoDrive Editor (FS25)
 
+[![CI](https://github.com/pgatzka/autodrive-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/pgatzka/autodrive-editor/actions/workflows/ci.yml)
+[![Release](https://github.com/pgatzka/autodrive-editor/actions/workflows/release.yml/badge.svg)](https://github.com/pgatzka/autodrive-editor/actions/workflows/release.yml)
+
 A desktop editor for route networks of the [AutoDrive](https://github.com/Stephan-S/FS25_AutoDrive) mod for Farming Simulator 25. Import your savegame's `AutoDrive_config.xml`, edit the waypoint network visually, and export it back.
 
 ![Screenshot](docs/screenshot.png)
@@ -48,6 +51,22 @@ Your routes live in `Documents/My Games/FarmingSimulator2025/savegame#/AutoDrive
 Each waypoint has an id, `x/y/z` position, a `flags` bitmask (`1` = subprio, `2` = traffic system) and two adjacency lists: `out` (ids it drives to) and `incoming` (ids that drive into it). A connection A→B with `B.incoming` containing A is a normal one-way link; both directions present means two-way; A→B *without* the incoming entry means the vehicle drives the segment in reverse. Map markers reference a waypoint id and carry a name and group.
 
 In the XML, `id/x/y/z/flags` are comma-separated lists; `out`/`incoming` are semicolon-separated per waypoint with comma-separated ids inside and `-1` for none.
+
+## Releases & updates
+
+CI (`.github/workflows/ci.yml`) typechecks, builds, and runs the test suite on every push and pull request.
+
+The release pipeline (`.github/workflows/release.yml`) is fully automated and everything starts as a **draft release**:
+
+- **Every push to `main`** builds installers for Windows, Linux, and macOS and uploads them to a draft release tagged `v<next-patch>-dev.<run>` — the **unstable** channel. Older dev drafts are pruned automatically, so there is always exactly one current dev draft.
+- **Pushing a tag `v*`** (e.g. `git tag v0.2.0 && git push origin v0.2.0`) builds the same installers into a draft release with that clean version. Publish that draft on GitHub to make it the new **stable** release, then bump the version in `package.json` on `main`.
+
+In the app, the **File → Updates** section lets you pick the update channel:
+
+- **Stable** checks published, non-prerelease GitHub releases — no credentials needed.
+- **Unstable** checks dev builds. Draft releases are only visible through the GitHub API with a token that can access the repository, so paste a (fine-grained, contents: read) token there once; it is stored locally on your machine.
+
+"Download & install" fetches the installer for your OS into your Downloads folder and, on Windows, starts it right away — the NSIS installer updates the app in place.
 
 ## Development notes
 

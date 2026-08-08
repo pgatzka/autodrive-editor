@@ -124,6 +124,23 @@ const results = await page.evaluate(async (xmlText) => {
   const re3 = xml.parseAutoDriveXml(xml.serializeAutoDriveXml(net4));
   assert(re3.network.waypoints.get(1).flags === 2, "traffic flag survives roundtrip");
 
+  // ---- update channel logic ----
+  const upd = await import("/src/model/updates.ts");
+  assert(upd.compareVersions("0.1.0", "0.1.0") === 0, "semver equal");
+  assert(upd.compareVersions("0.2.0", "0.1.9") > 0, "semver minor beats patch");
+  assert(upd.compareVersions("0.1.1-dev.2", "0.1.1-dev.10") < 0, "numeric prerelease compare (2 < 10)");
+  assert(upd.compareVersions("0.1.1", "0.1.1-dev.10") > 0, "release beats prerelease");
+  assert(upd.compareVersions("v0.1.1-dev.3", "0.1.0") > 0, "dev build of next patch beats current stable");
+  const releases = [
+    { tag: "v0.1.0", version: "0.1.0", name: "v0.1.0", draft: false, prerelease: false, createdAt: "", publishedAt: "", htmlUrl: "", body: "", assets: [] },
+    { tag: "v0.1.1-dev.5", version: "0.1.1-dev.5", name: "dev5", draft: true, prerelease: true, createdAt: "", publishedAt: null, htmlUrl: "", body: "", assets: [{ id: 1, name: "AutoDrive-Editor-Setup-0.1.1-dev.5.exe", size: 1, apiUrl: "" }] },
+    { tag: "v0.1.1-dev.9", version: "0.1.1-dev.9", name: "dev9", draft: true, prerelease: true, createdAt: "", publishedAt: null, htmlUrl: "", body: "", assets: [] },
+  ];
+  assert(upd.pickLatest(releases, "stable")?.version === "0.1.0", "stable channel ignores drafts/prereleases");
+  assert(upd.pickLatest(releases, "unstable")?.version === "0.1.1-dev.9", "unstable channel picks newest dev build");
+  assert(upd.assetForPlatform(releases[1], "win32")?.name.endsWith(".exe"), "windows asset matched");
+  assert(upd.assetForPlatform(releases[1], "linux") === null, "no linux asset in that release");
+
   return out;
 }, sampleXml);
 

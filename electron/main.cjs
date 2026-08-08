@@ -1,11 +1,21 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
+const { pipeline } = require("node:stream/promises");
+const { Readable } = require("node:stream");
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
+const GITHUB_OWNER = "pgatzka";
+const GITHUB_REPO = "autodrive-editor";
+const USER_AGENT = "autodrive-editor";
+
 function blueprintsFile() {
   return path.join(app.getPath("userData"), "blueprints.json");
+}
+
+function settingsFile() {
+  return path.join(app.getPath("userData"), "settings.json");
 }
 
 function createWindow() {
@@ -114,6 +124,90 @@ ipcMain.handle("blueprints:import", async (event) => {
     }
   }
   return imported;
+});
+
+// ---------- IPC: app settings (update channel, token, ...) ----------
+
+ipcMain.handle("settings:load", async () => {
+  try {
+    return JSON.parse(fs.readFileSync(settingsFile(), "utf-8"));
+  } catch {
+    return {};
+  }
+});
+
+ipcMain.handle("settings:save", async (event, settings) => {
+  fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
+  fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2), "utf-8");
+  return true;
+});
+
+// ---------- IPC: updates ----------
+
+ipcMain.handle("app:version", () => app.getVersion());
+
+function githubHeaders(token) {
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": USER_AGENT,
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+// Lists releases. With a token that has repo access this includes draft
+// releases (the unstable channel); anonymously only published releases appear.
+ipcMain.handle("update:check", async (event, { token }) => {
+  const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=30`;
+  const res = await fetch(url, { headers: githubHeaders(token) });
+  if (!res.ok) {
+    throw new Error(`GitHub API error: HTTP ${res.status}${res.status === 401 ? " (invalid token?)" : ""}`);
+  }
+  const releases = await res.json();
+  return releases.map((r) => ({
+    tag: r.tag_name,
+    version: String(r.tag_name || "").replace(/^v/, ""),
+    name: r.name || r.tag_name,
+    draft: !!r.draft,
+    prerelease: !!r.prerelease,
+    createdAt: r.created_at,
+    publishedAt: r.published_at,
+    htmlUrl: r.html_url,
+    body: r.body || "",
+    assets: (r.assets || []).map((a) => ({
+      id: a.id,
+      name: a.name,
+      size: a.size,
+      // the asset API endpoint works for drafts (with token) and public releases alike
+      apiUrl: a.url,
+    })),
+  }));
+});
+
+ipcMain.handle("update:download", async (event, { asset, token }) => {
+  const headers = githubHeaders(token);
+  headers.Accept = "application/octet-stream";
+  const res = await fetch(asset.apiUrl, { headers });
+  if (!res.ok || !res.body) {
+    throw new Error(`Download failed: HTTP ${res.status}`);
+  }
+  const dest = path.join(app.getPath("downloads"), asset.name);
+  await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(dest));
+  let launched = false;
+  if (process.platform === "win32" && dest.toLowerCase().endsWith(".exe")) {
+    // start the installer; NSIS updates in place
+    launched = (await shell.openPath(dest)) === "";
+  } else {
+    shell.showItemInFolder(dest);
+  }
+  return { path: dest, launched };
+});
+
+ipcMain.handle("update:openUrl", async (event, url) => {
+  if (typeof url === "string" && /^https:\/\/github\.com\//.test(url)) {
+    await shell.openExternal(url);
+  }
 });
 
 app.whenReady().then(() => {

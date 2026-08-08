@@ -1,0 +1,96 @@
+# Release pipeline
+#
+# - Every push to main builds installers for Windows/Linux/macOS and uploads
+#   them to a DRAFT release tagged v<next-patch>-dev.<run> (the "unstable"
+#   channel in the app's updater). Older dev drafts are pruned automatically.
+# - Pushing a tag v* builds the same installers into a DRAFT release with that
+#   clean version. Publishing that draft on GitHub makes it the new stable
+#   release (the app's "stable" channel uses published, non-prerelease
+#   releases). After publishing a stable release, bump the version in
+#   package.json on main.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      channel: ${{ steps.v.outputs.channel }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+            echo "channel=stable" >> "$GITHUB_OUTPUT"
+          else
+            BASE=$(node -p "require('./package.json').version")
+            NEXT=$(node -p "const [a,b,c]='$BASE'.split('.').map(Number); [a,b,c+1].join('.')")
+            echo "version=${NEXT}-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "channel=dev" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: version
+    strategy:
+      # sequential so electron-builder never races to create the same draft release
+      max-parallel: 1
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set build version
+        run: npm version --no-git-tag-version --allow-same-version "${{ needs.version.outputs.version }}"
+
+      - name: Build renderer
+        run: npm run build
+
+      - name: Package and upload to draft release
+        run: npx electron-builder --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # no code signing certificates configured
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+  finalize:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    if: needs.version.outputs.channel == 'dev'
+    steps:
+      - name: Mark dev draft as prerelease and prune older dev drafts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          RELEASES=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100")
+          ID=$(echo "$RELEASES" | jq -r ".[] | select(.tag_name==\"$TAG\") | .id" | head -n1)
+          if [ -n "$ID" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/$ID" -F prerelease=true > /dev/null
+            echo "Marked $TAG (id $ID) as prerelease"
+          fi
+          echo "$RELEASES" \
+            | jq -r ".[] | select(.draft and (.tag_name | test(\"-dev\\\\.\")) and .tag_name != \"$TAG\") | .id" \
+            | while read -r id; do
+                echo "Deleting stale dev draft id $id"
+                gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id"
+              done

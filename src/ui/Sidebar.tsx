@@ -15,6 +15,7 @@ import {
 import { FLAG_SUBPRIO, FLAG_TRAFFIC_SYSTEM } from "../model/types";
 import { store } from "../state/store";
 import { useStore } from "../state/useStore";
+import { UpdatePanel } from "./UpdatePanel";
 
 type Tab = "selection" | "markers" | "blueprints" | "file";
 
@@ -400,6 +401,7 @@ function FilePanel() {
       <p className="hint">
         Settings sections of an imported AutoDrive_config.xml are preserved untouched when saving.
       </p>
+      <UpdatePanel />
     </div>
   );
 }
