@@ -12,7 +12,6 @@ export function UpdatePanel() {
   const b = bridge();
   const [version, setVersion] = useState("dev");
   const [channel, setChannel] = useState<UpdateChannel>("stable");
-  const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [latest, setLatest] = useState<ReleaseInfo | null>(null);
@@ -23,7 +22,6 @@ export function UpdatePanel() {
     void b.getVersion().then(setVersion);
     void b.loadSettings().then((s) => {
       if (s.updateChannel === "stable" || s.updateChannel === "unstable") setChannel(s.updateChannel);
-      if (typeof s.githubToken === "string") setToken(s.githubToken);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -32,8 +30,12 @@ export function UpdatePanel() {
     return <p className="hint">Updates are only available in the desktop app.</p>;
   }
 
-  const persist = (nextChannel: UpdateChannel, nextToken: string) => {
-    void b.loadSettings().then((s) => b.saveSettings({ ...s, updateChannel: nextChannel, githubToken: nextToken }));
+  const selectChannel = (next: UpdateChannel) => {
+    setChannel(next);
+    setChecked(false);
+    setLatest(null);
+    setStatus("");
+    void b.loadSettings().then((s) => b.saveSettings({ ...s, updateChannel: next }));
   };
 
   const check = async () => {
@@ -41,16 +43,12 @@ export function UpdatePanel() {
     setStatus("Checking…");
     setLatest(null);
     try {
-      const releases = (await b.checkUpdates(token.trim() || undefined)) as ReleaseInfo[];
+      const releases = (await b.checkUpdates(undefined)) as ReleaseInfo[];
       const found = pickLatest(releases, channel);
       setLatest(found);
       setChecked(true);
       if (!found) {
-        setStatus(
-          channel === "unstable" && !token.trim()
-            ? "No releases found. Draft (unstable) builds need a GitHub token with access to the repository."
-            : "No releases found."
-        );
+        setStatus("No releases found on this channel yet.");
       } else {
         const cmp = compareVersions(found.version, version);
         setStatus(
@@ -78,7 +76,7 @@ export function UpdatePanel() {
     setBusy(true);
     setStatus(`Downloading ${asset.name} (${(asset.size / 1e6).toFixed(1)} MB)…`);
     try {
-      const result = await b.downloadUpdate(asset, token.trim() || undefined);
+      const result = await b.downloadUpdate(asset, undefined);
       setStatus(
         result.launched
           ? "Installer started — it will replace this installation. The app may close."
@@ -99,18 +97,7 @@ export function UpdatePanel() {
       <p className="hint">Installed version: {version}</p>
       <div className="row">
         <label className="row">
-          <input
-            type="radio"
-            name="channel"
-            checked={channel === "stable"}
-            onChange={() => {
-              setChannel("stable");
-              setChecked(false);
-              setLatest(null);
-              setStatus("");
-              persist("stable", token);
-            }}
-          />
+          <input type="radio" name="channel" checked={channel === "stable"} onChange={() => selectChannel("stable")} />
           Stable
         </label>
         <label className="row">
@@ -118,33 +105,13 @@ export function UpdatePanel() {
             type="radio"
             name="channel"
             checked={channel === "unstable"}
-            onChange={() => {
-              setChannel("unstable");
-              setChecked(false);
-              setLatest(null);
-              setStatus("");
-              persist("unstable", token);
-            }}
+            onChange={() => selectChannel("unstable")}
           />
           Unstable (dev builds)
         </label>
       </div>
       {channel === "unstable" && (
-        <div className="col">
-          <span className="hint">
-            Dev builds live in draft releases, which the GitHub API only shows with a token that can access the
-            repository (stored locally on this machine).
-          </span>
-          <input
-            type="password"
-            placeholder="GitHub token (for draft releases)"
-            value={token}
-            onChange={(e) => {
-              setToken(e.target.value);
-              persist(channel, e.target.value);
-            }}
-          />
-        </div>
+        <p className="hint">Dev builds are published automatically from every change on main.</p>
       )}
       <div className="row">
         <button disabled={busy} onClick={() => void check()}>

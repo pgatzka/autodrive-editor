@@ -1,13 +1,16 @@
-# Release pipeline: test -> prepare draft release -> build all OSes in parallel -> prune
+# Release pipeline: test -> prepare draft -> build all OSes in parallel -> publish/prune
 #
 # - Nothing is released unless the test suite passes first.
-# - Every push to main ships installers for Windows/Linux/macOS to a DRAFT
-#   prerelease tagged v<next-patch>-dev.<run> (the app's "unstable" channel).
-#   Older dev drafts are pruned automatically.
-# - Pushing a tag v* ships the same installers to a draft release with that
-#   clean version. Publishing that draft on GitHub makes it the new stable
-#   release (the app's "stable" channel). Afterwards bump the version in
-#   package.json on main.
+# - Every push to main ships installers for Windows/Linux/macOS tagged
+#   v<next-patch>-dev.<run>. The builds upload into a draft so nothing
+#   half-finished is visible; once all assets are attached the finalize job
+#   PUBLISHES it as a prerelease — the app's "unstable" channel, visible to
+#   the anonymous GitHub API, no token required. Older dev builds (and their
+#   tags) are pruned automatically.
+# - Pushing a tag v* ships the same installers to a DRAFT release with that
+#   clean version. Publishing that draft on GitHub manually makes it the new
+#   stable release (the app's "stable" channel). Afterwards bump the version
+#   in package.json on main.
 #
 # The draft release is created once, up front, in the prepare job — the three
 # platform builds then upload into it concurrently without racing to create it.
@@ -16,7 +19,8 @@ name: Release
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    # dev tags are created by the pipeline itself; only clean v* tags build stable releases
+    tags: ["v*", "!v*-dev.*"]
   workflow_dispatch:
 
 permissions:
@@ -121,7 +125,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
   finalize:
-    name: Prune stale dev drafts
+    name: Publish dev prerelease and prune stale dev builds
     needs: [prepare, build]
     runs-on: ubuntu-latest
     if: needs.prepare.outputs.channel == 'dev'
@@ -129,21 +133,36 @@ jobs:
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.prepare.outputs.version }}
-        # only prune drafts with a LOWER run number, so an overlapping newer
-        # run's draft can never be deleted by an older run finishing late
+        # Publishing turns the fully-uploaded draft into a prerelease that the
+        # anonymous GitHub API can see (drafts never are), so the app's
+        # unstable channel needs no token. Pruning only touches dev builds with
+        # a LOWER run number, so an overlapping newer run can never be deleted
+        # by an older run finishing late.
         run: |
           TAG="v${VERSION}"
+          RELEASES=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100")
+
+          ID=$(echo "$RELEASES" | jq -r --arg tag "$TAG" \
+            '[.[] | select(.tag_name == $tag and .draft)] | first | .id // empty')
+          if [ -n "$ID" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/$ID" \
+              -F draft=false -F prerelease=true > /dev/null
+            echo "Published $TAG as prerelease"
+          fi
+
           # match on tag OR name: drafts created without an explicit tag carry a
           # placeholder tag_name (untagged-...) and only the name has the version
-          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+          echo "$RELEASES" \
             | jq -r --arg tag "$TAG" --argjson cur "${GITHUB_RUN_NUMBER}" '
                 .[]
-                | select(.draft and .tag_name != $tag)
+                | select(.tag_name != $tag)
+                | select(.draft or .prerelease)
                 | (((.name // "") + " " + (.tag_name // ""))) as $label
                 | select($label | test("-dev\\."))
                 | select(($label | capture("-dev\\.(?<n>[0-9]+)").n | tonumber) < $cur)
-                | .id' \
-            | while read -r id; do
-                echo "Deleting stale dev draft id $id"
+                | "\(.id) \(.tag_name)"' \
+            | while read -r id tag; do
+                echo "Deleting stale dev build $tag (id $id)"
                 gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/$id"
+                gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/$tag" > /dev/null 2>&1 || true
               done

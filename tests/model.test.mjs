@@ -146,6 +146,13 @@ const results = await page.evaluate(async (xmlText) => {
   ];
   assert(upd.pickLatest(releases, "stable")?.version === "0.1.0", "stable channel ignores drafts/prereleases");
   assert(upd.pickLatest(releases, "unstable")?.version === "0.1.1-dev.9", "unstable channel picks newest dev build");
+  // dev builds ship as published (non-draft) prereleases — visible without a token
+  const published = [
+    releases[0],
+    { ...releases[2], tag: "v0.1.1-dev.12", version: "0.1.1-dev.12", draft: false, prerelease: true },
+  ];
+  assert(upd.pickLatest(published, "unstable")?.version === "0.1.1-dev.12", "published prerelease found on unstable channel");
+  assert(upd.pickLatest(published, "stable")?.version === "0.1.0", "published prerelease still hidden from stable channel");
   assert(upd.assetForPlatform(releases[1], "win32")?.name.endsWith(".exe"), "windows asset matched");
   assert(upd.assetForPlatform(releases[1], "linux") === null, "no linux asset in that release");
 

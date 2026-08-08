@@ -57,15 +57,15 @@ In the XML, `id/x/y/z/flags` are comma-separated lists; `out`/`incoming` are sem
 
 CI (`.github/workflows/ci.yml`) typechecks, builds, and runs the test suite on every push and pull request.
 
-The release pipeline (`.github/workflows/release.yml`) is fully automated and everything starts as a **draft release**:
+The release pipeline (`.github/workflows/release.yml`) is fully automated and only runs after the test suite passes:
 
-- **Every push to `main`** builds installers for Windows, Linux, and macOS and uploads them to a draft release tagged `v<next-patch>-dev.<run>` — the **unstable** channel. Older dev drafts are pruned automatically, so there is always exactly one current dev draft.
-- **Pushing a tag `v*`** (e.g. `git tag v0.2.0 && git push origin v0.2.0`) builds the same installers into a draft release with that clean version. Publish that draft on GitHub to make it the new **stable** release, then bump the version in `package.json` on `main`.
+- **Every push to `main`** builds installers for Windows, Linux, and macOS. They upload into a draft (nothing half-finished is ever visible), and once all assets are attached the pipeline publishes it as a **prerelease** tagged `v<next-patch>-dev.<run>` — the **unstable** channel. Older dev builds and their tags are pruned automatically, so there is always exactly one current dev build.
+- **Pushing a tag `v*`** (e.g. `git tag v0.2.0 && git push origin v0.2.0`) builds the same installers into a **draft release** with that clean version. Publish that draft on GitHub to make it the new **stable** release, then bump the version in `package.json` on `main`.
 
-In the app, the **File → Updates** section lets you pick the update channel:
+In the app, the **File → Updates** section lets you pick the update channel — no credentials needed for either:
 
-- **Stable** checks published, non-prerelease GitHub releases — no credentials needed.
-- **Unstable** checks dev builds. Draft releases are only visible through the GitHub API with a token that can access the repository, so paste a (fine-grained, contents: read) token there once; it is stored locally on your machine.
+- **Stable** checks published, non-prerelease GitHub releases.
+- **Unstable** checks the automatically published dev prereleases.
 
 "Download & install" fetches the installer for your OS into your Downloads folder and, on Windows, starts it right away — the NSIS installer updates the app in place.
 
