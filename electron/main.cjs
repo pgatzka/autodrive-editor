@@ -146,9 +146,17 @@ ipcMain.handle("background:read", async (event, { pathOrFolder }) => {
       return null;
     }
   };
+  const readBinary = (name) => {
+    try {
+      return fs.readFileSync(path.join(folder, name));
+    } catch {
+      return null;
+    }
+  };
   return {
     folder,
     heightmap: fs.readFileSync(heightmapPath),
+    typeCache: readBinary("terrain.lod.type.cache"),
     careerXml: readText("careerSavegame.xml"),
     placeablesXml: readText("placeables.xml"),
     vehiclesXml: readText("vehicles.xml"),

@@ -169,6 +169,31 @@ const results = await page.evaluate(async (xmlText) => {
   const netForY = { waypoints: new Map(), markers: [], groups: ["All"], mapName: "", routeAuthor: "", routeVersion: "", nextId: 1 };
   assert(Math.abs(bgMod.nodeHeightAt(background, netForY, 10, 10) - 128) < 0.1, "new node height from terrain");
 
+  // ---- floor tiles: terrain.lod.type.cache parsing + palette ----
+  const tt = await import("/src/model/terrainTypes.ts");
+  const cache = new Uint8Array(12 + 4 * 4 * 2);
+  new DataView(cache.buffer).setUint32(0, tt.TERRAIN_TYPE_MAGIC, true);
+  new DataView(cache.buffer).setUint32(4, 1, true);
+  new DataView(cache.buffer).setUint32(8, 4, true);
+  const cells = [7, 9, 7, 9, 9, 7, 9, 7, 7, 3, 7, 9, 7, 3, 7, 9]; // 7 x8, 9 x6, 3 x2
+  cells.forEach((t, i) => {
+    cache[12 + i * 2] = t;
+    cache[12 + i * 2 + 1] = 0xff;
+  });
+  const layer = tt.parseTerrainTypeCache(cache);
+  assert(layer.size === 4 && layer.types.length === 16 && layer.types[1] === 9, "terrain type cache parsed");
+  const pal = tt.buildTypePalette(layer.types);
+  const c7 = pal.get(7);
+  const c9 = pal.get(9);
+  const c3 = pal.get(3);
+  assert(c7 && c9 && c3 && c7.join() !== c3.join(), "palette assigns distinct colors");
+  assert(Math.abs(c7[1] - c9[1]) < 10 && c7[1] > c7[0], "dominant ground pair gets near-identical greens");
+  const bgTyped = await bgMod.buildBackground({ heightmap: hmBytes, typeCache: cache });
+  assert(bgTyped.canvas.width === 4, "typed background canvas at type-layer resolution");
+  const badCache = new Uint8Array(12);
+  const bgFallback = await bgMod.buildBackground({ heightmap: hmBytes, typeCache: badCache });
+  assert(bgFallback.canvas.width === 2049, "invalid type cache falls back to hillshade");
+
   // ---- update channel logic ----
   const upd = await import("/src/model/updates.ts");
   assert(upd.compareVersions("0.1.0", "0.1.0") === 0, "semver equal");

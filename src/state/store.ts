@@ -203,6 +203,7 @@ export interface AdBridge {
   readBackground(pathOrFolder: string): Promise<{
     folder: string;
     heightmap: Uint8Array;
+    typeCache: Uint8Array | null;
     careerXml: string | null;
     placeablesXml: string | null;
     vehiclesXml: string | null;

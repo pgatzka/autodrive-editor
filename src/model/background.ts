@@ -1,6 +1,7 @@
 import { RouteNetwork } from "./types";
 import { estimateY } from "./graph";
 import { decodeGray16Png } from "./png16";
+import { buildTypePalette, parseTerrainTypeCache, TerrainTypeLayer } from "./terrainTypes";
 
 /**
  * Map background rendered from files inside an FS25 savegame folder:
@@ -33,6 +34,8 @@ export interface SavegameBackground {
 
 export interface BackgroundFiles {
   heightmap: Uint8Array;
+  /** terrain.lod.type.cache — the painted ground-texture layer */
+  typeCache?: Uint8Array | null;
   careerXml?: string | null;
   placeablesXml?: string | null;
   vehiclesXml?: string | null;
@@ -44,8 +47,17 @@ export async function buildBackground(files: BackgroundFiles): Promise<SavegameB
   const samples = img.width;
   const sizeMeters = samples - 1;
 
+  let typeLayer: TerrainTypeLayer | null = null;
+  if (files.typeCache && files.typeCache.length > 0) {
+    try {
+      typeLayer = parseTerrainTypeCache(files.typeCache);
+    } catch {
+      typeLayer = null; // fall back to pure hillshade
+    }
+  }
+
   return {
-    canvas: renderHillshade(img.data, samples),
+    canvas: renderTerrain(img.data, samples, typeLayer),
     sizeMeters,
     mapTitle: files.careerXml ? parseMapTitle(files.careerXml) : "",
     heights: img.data,
@@ -83,12 +95,15 @@ export function nodeHeightAt(bg: SavegameBackground | null, net: RouteNetwork, x
   return estimateY(net, x, z);
 }
 
-function renderHillshade(heights: Uint16Array, samples: number): HTMLCanvasElement {
+function renderTerrain(heights: Uint16Array, samples: number, typeLayer: TerrainTypeLayer | null): HTMLCanvasElement {
+  const size = typeLayer ? typeLayer.size : samples;
+  const palette = typeLayer ? buildTypePalette(typeLayer.types) : null;
+
   const canvas = document.createElement("canvas");
-  canvas.width = samples;
-  canvas.height = samples;
+  canvas.width = size;
+  canvas.height = size;
   const ctx = canvas.getContext("2d")!;
-  const img = ctx.createImageData(samples, samples);
+  const img = ctx.createImageData(size, size);
   const px = img.data;
 
   let min = 0xffff;
@@ -99,7 +114,7 @@ function renderHillshade(heights: Uint16Array, samples: number): HTMLCanvasEleme
   }
   const range = Math.max(max - min, 1);
 
-  // elevation tint: valley green -> highland tan
+  // elevation tint fallback when no type layer exists: valley green -> highland tan
   const low = [56, 88, 62];
   const high = [148, 144, 106];
   // light from the north-west
@@ -107,24 +122,41 @@ function renderHillshade(heights: Uint16Array, samples: number): HTMLCanvasEleme
   const lz = -0.5;
   const ly = 1.2;
   const llen = Math.hypot(lx, ly, lz);
+  // canvas pixel -> heightmap sample (both cover the same world extent)
+  const hmStep = (samples - 1) / Math.max(size - 1, 1);
 
-  for (let z = 0; z < samples; z++) {
-    for (let x = 0; x < samples; x++) {
-      const i = z * samples + x;
-      const hC = heights[i];
-      const hX = heights[z * samples + Math.min(x + 1, samples - 1)];
-      const hZ = heights[Math.min(z + 1, samples - 1) * samples + x];
-      // meters per sample is ~1; slope in meters
+  for (let z = 0; z < size; z++) {
+    const hz = Math.min(Math.round(z * hmStep), samples - 1);
+    for (let x = 0; x < size; x++) {
+      const hx = Math.min(Math.round(x * hmStep), samples - 1);
+      const hC = heights[hz * samples + hx];
+      const hX = heights[hz * samples + Math.min(hx + 1, samples - 1)];
+      const hZ = heights[Math.min(hz + 1, samples - 1) * samples + hx];
+      // ~1 m per sample; slope in meters
       const dx = (hX - hC) * HEIGHT_SCALE;
       const dz = (hZ - hC) * HEIGHT_SCALE;
       const nlen = Math.hypot(dx, 1, dz);
       const lambert = Math.max((-dx * lx + ly - dz * lz) / (nlen * llen), 0);
       const shade = 0.55 + 0.45 * lambert;
-      const t = (hC - min) / range;
-      const o = i * 4;
-      px[o] = Math.min(255, (low[0] + (high[0] - low[0]) * t) * shade);
-      px[o + 1] = Math.min(255, (low[1] + (high[1] - low[1]) * t) * shade);
-      px[o + 2] = Math.min(255, (low[2] + (high[2] - low[2]) * t) * shade);
+
+      let r: number;
+      let g: number;
+      let b: number;
+      if (typeLayer && palette) {
+        const color = palette.get(typeLayer.types[z * typeLayer.size + x])!;
+        r = color[0];
+        g = color[1];
+        b = color[2];
+      } else {
+        const t = (hC - min) / range;
+        r = low[0] + (high[0] - low[0]) * t;
+        g = low[1] + (high[1] - low[1]) * t;
+        b = low[2] + (high[2] - low[2]) * t;
+      }
+      const o = (z * size + x) * 4;
+      px[o] = Math.min(255, r * shade);
+      px[o + 1] = Math.min(255, g * shade);
+      px[o + 2] = Math.min(255, b * shade);
       px[o + 3] = 255;
     }
   }
