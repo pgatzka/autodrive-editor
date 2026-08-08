@@ -1,4 +1,3 @@
-import { wrapOffset } from "../model/grid";
 import { ConnectionMode } from "../model/types";
 import { setShortcutsOpen } from "../state/feedback";
 import { store, Tool } from "../state/store";
@@ -101,6 +100,20 @@ export function Toolbar() {
           value={state.settings.gridOffsetZ}
           onCommit={(value) => store.update((s) => (s.settings.gridOffsetZ = value))}
         />
+        <span
+          className="offset-field"
+          title={`Cells per chunk — every Nth line is emphasised (${chunkMeters(state.settings)} m)`}
+        >
+          <span className="axis">Chunk</span>
+          <NumberInput
+            value={state.settings.gridMajorEvery}
+            ariaLabel="Cells per chunk"
+            width={42}
+            className="bare"
+            rules={{ min: MIN_CHUNK, max: MAX_CHUNK, decimals: 0 }}
+            onCommit={(value) => store.update((s) => (s.settings.gridMajorEvery = value))}
+          />
+        </span>
         <button
           className={cx("snap-toggle", state.settings.snapEnabled && "on")}
           title="Snap waypoints to the grid (G)"
@@ -147,18 +160,15 @@ function OffsetField({
   value: number;
   onCommit: (value: number) => void;
 }) {
-  const state = useStore();
-  const size = state.settings.gridSize;
   return (
-    <span className="offset-field" title={`Shift the grid along ${axis} (0 – ${size} m)`}>
+    <span className="offset-field" title={`Shift the grid along ${axis}, in meters`}>
       <span className="axis">{axis}</span>
       <NumberInput
         value={value}
         ariaLabel={`Grid offset ${axis}`}
         width={50}
         className="bare"
-        // an offset beyond one cell is the same grid, so it wraps on commit
-        rules={{ decimals: 1, transform: (offset) => wrapOffset(offset, size) }}
+        rules={{ decimals: 1 }}
         onCommit={onCommit}
       />
     </span>
@@ -175,17 +185,16 @@ export function selectTool(tool: Tool): void {
 
 export const MIN_GRID_SIZE = 0.1;
 export const MAX_GRID_SIZE = 500;
+export const MIN_CHUNK = 2;
+export const MAX_CHUNK = 200;
 
-/**
- * Changing the size keeps the offsets inside the new cell, so the grid never
- * ends up with an offset larger than its own spacing.
- */
+/** A chunk's span in meters, shown so the number means something on the map. */
+export function chunkMeters(settings: { gridSize: number; gridMajorEvery: number }): number {
+  return Math.round(settings.gridSize * settings.gridMajorEvery * 100) / 100;
+}
+
 function setGridSize(size: number): void {
-  store.update((s) => {
-    s.settings.gridSize = size;
-    s.settings.gridOffsetX = wrapOffset(s.settings.gridOffsetX, size);
-    s.settings.gridOffsetZ = wrapOffset(s.settings.gridOffsetZ, size);
-  });
+  store.update((s) => (s.settings.gridSize = size));
 }
 
 /** The − / + buttons walk the sizes players actually use; typing allows any. */

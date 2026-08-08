@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { EditorCanvas } from "./editor/EditorCanvas";
 import { useKeyboardShortcuts } from "./editor/useKeyboardShortcuts";
 import { loadBlueprintLibrary } from "./files/fileio";
+import { watchGridSettings } from "./state/gridPersistence";
 import { useStore } from "./state/useStore";
 import { Inspector } from "./ui/Inspector";
 import { Dialogs } from "./ui/overlays/Dialogs";
@@ -23,6 +24,7 @@ export default function App() {
   useKeyboardShortcuts();
   useEffect(() => {
     void loadBlueprintLibrary();
+    return watchGridSettings();
   }, []);
 
   return (

@@ -111,6 +111,45 @@ try {
   check(gridState.size === 2.5, `typed grid size committed (got ${gridState.size})`);
   check(gridState.x === 1.7, `typed offset committed (got ${gridState.x})`);
 
+  // a fine grid used to swallow whole-number offsets, and the chunk width is
+  // now the user's to choose
+  await gridSize.click();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.type("0.5");
+  await page.keyboard.press("Enter");
+  await offsetX.click();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.type("2");
+  await page.keyboard.press("Enter");
+  const chunk = page.getByRole("textbox", { name: "Cells per chunk" });
+  await chunk.click();
+  await page.keyboard.press("Control+a");
+  await page.keyboard.type("4");
+  await page.keyboard.press("Enter");
+  const fineGrid = await page.evaluate(async () => {
+    const { store } = await import("/src/state/store.ts");
+    const { gridSize, gridOffsetX, gridMajorEvery } = store.state.settings;
+    return { size: gridSize, x: gridOffsetX, chunk: gridMajorEvery };
+  });
+  check(fineGrid.x === 2, `offset survives a 0.5 m grid (got ${fineGrid.x})`);
+  check(fineGrid.chunk === 4, `chunk width committed (got ${fineGrid.chunk})`);
+
+  // grid settings are remembered per map
+  const remembered = await page.evaluate(async () => {
+    const { store } = await import("/src/state/store.ts");
+    const { restoreGridForMap, saveGridForMap, currentGrid, applyGrid, defaultGrid } =
+      await import("/src/state/gridPersistence.ts");
+    const mine = currentGrid();
+    await saveGridForMap("SmokeMap", mine);
+    applyGrid(defaultGrid());
+    store.update((s) => (s.network.mapName = "SmokeMap"));
+    return { mine, restored: await restoreGridForMap("SmokeMap") };
+  });
+  check(
+    JSON.stringify(remembered.restored) === JSON.stringify(remembered.mine),
+    `grid restored per map (got ${JSON.stringify(remembered.restored)})`
+  );
+
   // shortcuts sheet opens from the strip and closes on Escape
   await page.click("button:has-text('Shortcuts')");
   check(await page.locator(".dialog").isVisible(), "shortcuts dialog opens");

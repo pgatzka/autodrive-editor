@@ -12,7 +12,6 @@ import {
   chevronSpacing,
   CONNECTION_COLORS,
   linkWidth,
-  MAJOR_GRID_EVERY,
   MIN_GRID_SPACING_PX,
   MIN_SMOOTHING_SCALE,
   nodeRadius,
@@ -87,6 +86,7 @@ function gridOf(state: EditorState): Grid {
     size: state.settings.gridSize,
     offsetX: state.settings.gridOffsetX,
     offsetZ: state.settings.gridOffsetZ,
+    majorEvery: state.settings.gridMajorEvery,
   };
 }
 
@@ -125,24 +125,24 @@ function drawGrid(
 ): void {
   if (grid.size <= 0) return;
   const minorVisible = grid.size * viewport.scale >= MIN_GRID_SPACING_PX;
-  const majorVisible = grid.size * viewport.scale * MAJOR_GRID_EVERY >= MIN_GRID_SPACING_PX;
+  const majorVisible = grid.size * viewport.scale * grid.majorEvery >= MIN_GRID_SPACING_PX;
   if (!majorVisible) return;
 
   const minor = blueprintMode ? CANVAS_COLORS.gridMinorBlueprint : CANVAS_COLORS.gridMinor;
   const major = blueprintMode ? CANVAS_COLORS.gridMajorBlueprint : CANVAS_COLORS.gridMajor;
   // when minor lines are too dense to read, only every tenth line is drawn
-  const step = minorVisible ? grid.size : grid.size * MAJOR_GRID_EVERY;
+  const step = minorVisible ? grid.size : grid.size * grid.majorEvery;
   ctx.lineWidth = 1;
 
   const maxX = viewport.toWorldX(viewport.width);
   for (let x = firstLineAtOrAfter(viewport.toWorldX(0), step, grid.offsetX); x <= maxX; x += step) {
-    ctx.strokeStyle = isMajorLine(x, grid.size, grid.offsetX, MAJOR_GRID_EVERY) ? major : minor;
+    ctx.strokeStyle = isMajorLine(x, grid.size, grid.offsetX, grid.majorEvery) ? major : minor;
     const sx = Math.round(viewport.toScreenX(x)) + 0.5;
     strokeLine(ctx, sx, 0, sx, viewport.height);
   }
   const maxZ = viewport.toWorldZ(viewport.height);
   for (let z = firstLineAtOrAfter(viewport.toWorldZ(0), step, grid.offsetZ); z <= maxZ; z += step) {
-    ctx.strokeStyle = isMajorLine(z, grid.size, grid.offsetZ, MAJOR_GRID_EVERY) ? major : minor;
+    ctx.strokeStyle = isMajorLine(z, grid.size, grid.offsetZ, grid.majorEvery) ? major : minor;
     const sy = Math.round(viewport.toScreenY(z)) + 0.5;
     strokeLine(ctx, 0, sy, viewport.width, sy);
   }

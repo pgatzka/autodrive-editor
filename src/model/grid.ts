@@ -9,7 +9,12 @@ export interface Grid {
   size: number;
   offsetX: number;
   offsetZ: number;
+  /** cells per chunk — every Nth line is emphasised */
+  majorEvery: number;
 }
+
+/** Cells per chunk when nothing else is stored — the value FS25 maps tend to use. */
+export const DEFAULT_MAJOR_EVERY = 10;
 
 /** Nearest grid coordinate to `value` on an axis with this offset. */
 export function snapTo(value: number, size: number, offset: number): number {
@@ -18,8 +23,10 @@ export function snapTo(value: number, size: number, offset: number): number {
 }
 
 /**
- * Offsets are equivalent modulo the grid size, so keep them in [0, size).
- * Without this, "align to waypoint" would store ever-growing numbers.
+ * Offsets are equivalent modulo the grid size, so a computed one is reduced to
+ * the smallest equivalent. Only used for values the app derives — a typed
+ * offset is kept exactly as entered, because wrapping it would silently turn
+ * "2" into "0" on a 0.5 m grid and look like the field refusing input.
  */
 export function wrapOffset(offset: number, size: number): number {
   if (size <= 0 || !Number.isFinite(offset)) return 0;

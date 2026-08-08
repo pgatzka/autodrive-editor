@@ -1,6 +1,7 @@
 import { buildBackground } from "../model/background";
 import { errorMessage } from "../model/errors";
 import { parseAutoDriveXml, serializeAutoDriveXml } from "../model/xml";
+import { restoreGridForMap } from "../state/gridPersistence";
 import { bridge, store } from "../state/store";
 import { Blueprint } from "../model/types";
 import { isBlueprint } from "../model/blueprint";
@@ -44,6 +45,8 @@ function applyOpenedXml(path: string | undefined, content: string) {
   fitViewToNetwork();
   store.clearHistory();
   store.notify();
+  // grid settings belong to the map, so bring back the ones used last time
+  void restoreGridForMap(network.mapName);
 }
 
 /**

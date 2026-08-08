@@ -16,7 +16,7 @@ the brief it was built from.
 ## Features
 
 - **Import / export `AutoDrive_config.xml`** — exact FS25 format. Waypoint ids are compacted to `1..N` on save, and all other sections of an imported file (user settings, experimental features, …) are preserved untouched.
-- **Grid snapping** — configurable grid granularity in meters, toggle with `G`. Applies to placing, dragging, and blueprint stamping.
+- **Grid snapping** — configurable grid granularity in meters, an X/Z offset that shifts the grid onto whatever the map already has, and a chunk width (how many cells apart the emphasised lines sit). All four are typed or stepped, and they are remembered per map: open a config and the grid you last used on that map comes back. Toggle snapping with `G`; it applies to placing, dragging, and blueprint stamping.
 - **Grid route tool** — connect two nodes and a node is created at _every grid-line crossing_ along the route, spaced by your grid setting.
 - **Full node/edge editing** — add, move, delete; one-way, two-way, and reverse connections; box select; undo/redo.
 - **Blueprints** — save any selection (nodes + connections + markers) as a named blueprint, stamp it anywhere with live move/rotate preview. The library persists between sessions and blueprints can be exported/imported as JSON files to share.

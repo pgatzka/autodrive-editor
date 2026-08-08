@@ -68,4 +68,15 @@ describe("isMajorLine", () => {
     expect(isMajorLine(21.5, 2, 1.5, 10)).toBe(true);
     expect(isMajorLine(20, 2, 1.5, 10)).toBe(false);
   });
+
+  it("counts whatever chunk width the map uses", () => {
+    // a 4-cell chunk of a 2 m grid is 8 m wide
+    expect(isMajorLine(8, 2, 0, 4)).toBe(true);
+    expect(isMajorLine(-8, 2, 0, 4)).toBe(true);
+    expect(isMajorLine(20, 2, 0, 4)).toBe(false);
+
+    // a 16-cell chunk of a 0.5 m grid is 8 m wide too
+    expect(isMajorLine(8, 0.5, 0, 16)).toBe(true);
+    expect(isMajorLine(4, 0.5, 0, 16)).toBe(false);
+  });
 });

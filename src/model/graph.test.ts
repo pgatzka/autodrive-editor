@@ -22,7 +22,7 @@ let net: RouteNetwork;
 
 /** A grid aligned to the origin, unless a test says otherwise. */
 function grid(size: number, offsetX = 0, offsetZ = 0): Grid {
-  return { size, offsetX, offsetZ };
+  return { size, offsetX, offsetZ, majorEvery: 10 };
 }
 
 /** Chain of nodes along the x axis at 10 m spacing. */

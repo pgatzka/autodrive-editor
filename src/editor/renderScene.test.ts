@@ -96,6 +96,9 @@ beforeEach(() => {
     s.pendingConnectFrom = null;
     s.pendingDeletion = null;
     s.settings.gridSize = 2;
+    s.settings.gridOffsetX = 0;
+    s.settings.gridOffsetZ = 0;
+    s.settings.gridMajorEvery = 10;
     s.settings.showIcons = true;
     s.settings.backgroundOpacity = 0.85;
   });
@@ -130,6 +133,36 @@ describe("renderScene", () => {
     // at 0.5 px/m the 2 m grid is too dense, but the 20 m major grid survives
     expect(denseOps().filter((op) => op === "stroke").length).toBeGreaterThan(0);
     expect(sparseOps().filter((op) => op === "stroke")).toHaveLength(0);
+  });
+
+  it("emphasises a line every chunk, however wide the chunk is set", () => {
+    const majorLines = (cellsPerChunk: number) => {
+      store.update((s) => (s.settings.gridMajorEvery = cellsPerChunk));
+      const { ctx, styles } = recordingContext();
+      renderScene(ctx, store.state, VIEWPORT, NO_OVERLAYS);
+      return styles.filter((style) => style === CANVAS_COLORS.gridMajor).length;
+    };
+
+    // the viewport spans 200 m of a 2 m grid: 10-cell chunks are 20 m apart,
+    // 4-cell chunks 8 m, so shrinking the chunk emphasises ~2.5x as many lines
+    const wide = majorLines(10);
+    const narrow = majorLines(4);
+    expect(wide).toBeGreaterThan(0);
+    expect(narrow / wide).toBeGreaterThan(2);
+    expect(narrow / wide).toBeLessThan(3);
+  });
+
+  it("shifts the grid with the offset instead of redrawing it on the origin", () => {
+    const firstLine = (offsetX: number) => {
+      store.update((s) => (s.settings.gridOffsetX = offsetX));
+      const { ctx, calls } = recordingContext();
+      renderScene(ctx, store.state, VIEWPORT, NO_OVERLAYS);
+      const move = calls.find((call) => call.op === "moveTo");
+      return VIEWPORT.toWorldX(Number(move?.args[0]));
+    };
+
+    // a 0.5 m shift of a 2 m grid moves every line, it does not snap back
+    expect(firstLine(0.5) - firstLine(0)).toBeCloseTo(0.5, 6);
   });
 
   it("cases every link so it reads over any terrain", () => {

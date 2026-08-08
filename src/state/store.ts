@@ -1,5 +1,5 @@
 import { SavegameBackground } from "../model/background";
-import { Grid, snapTo } from "../model/grid";
+import { DEFAULT_MAJOR_EVERY, Grid, snapTo } from "../model/grid";
 import { Blueprint, ConnectionMode, RouteNetwork, emptyNetwork } from "../model/types";
 
 export type Tool = "select" | "add" | "connect" | "gridroute" | "place";
@@ -40,6 +40,8 @@ export interface EditorSettings {
   /** grid origin shift, so the grid can line up with what is already on the map */
   gridOffsetX: number;
   gridOffsetZ: number;
+  /** cells per chunk — every Nth grid line is emphasised */
+  gridMajorEvery: number;
   snapEnabled: boolean;
   connectionMode: ConnectionMode;
   curveSegments: number;
@@ -133,6 +135,7 @@ export class EditorStore {
       gridSize: 2,
       gridOffsetX: 0,
       gridOffsetZ: 0,
+      gridMajorEvery: DEFAULT_MAJOR_EVERY,
       snapEnabled: true,
       connectionMode: "oneway",
       curveSegments: 6,
@@ -227,10 +230,15 @@ export class EditorStore {
     this.redoStack = h.redo;
   }
 
-  /** The active grid, or a disabled one while snapping is off. */
+  /** The grid as the canvas and the tools see it. */
   grid(): Grid {
-    const { gridSize, gridOffsetX, gridOffsetZ } = this.state.settings;
-    return { size: gridSize, offsetX: gridOffsetX, offsetZ: gridOffsetZ };
+    const { gridSize, gridOffsetX, gridOffsetZ, gridMajorEvery } = this.state.settings;
+    return {
+      size: gridSize,
+      offsetX: gridOffsetX,
+      offsetZ: gridOffsetZ,
+      majorEvery: gridMajorEvery,
+    };
   }
 
   snapX(value: number): number {

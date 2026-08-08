@@ -64,7 +64,6 @@ export const MIN_SMOOTHING_SCALE = 1;
 
 /** Grid lines are dropped when they would be denser than this. */
 export const MIN_GRID_SPACING_PX = 6;
-export const MAJOR_GRID_EVERY = 10;
 
 /** r = clamp(2.2, s·0.95, 7) */
 export function nodeRadius(scale: number): number {
