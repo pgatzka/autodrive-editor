@@ -1,3 +1,4 @@
+import { SavegameBackground } from "../model/background";
 import { Blueprint, ConnectionMode, RouteNetwork, emptyNetwork } from "../model/types";
 
 export type Tool = "select" | "add" | "connect" | "gridroute" | "place";
@@ -15,6 +16,8 @@ export interface EditorSettings {
   snapEnabled: boolean;
   connectionMode: ConnectionMode;
   curveSegments: number;
+  backgroundOpacity: number;
+  showIcons: boolean;
 }
 
 export interface PendingPlacement {
@@ -56,6 +59,8 @@ export interface EditorState {
   blueprints: Blueprint[];
   /** non-null while the blueprint editor is open */
   blueprintEdit: BlueprintEditSession | null;
+  /** terrain background loaded from a savegame folder */
+  background: SavegameBackground | null;
   dirty: boolean;
   statusMessage: string;
 }
@@ -88,11 +93,19 @@ export class EditorStore {
     selection: new Set(),
     view: { cx: 0, cz: 0, scale: 2 },
     tool: "select",
-    settings: { gridSize: 2, snapEnabled: true, connectionMode: "oneway", curveSegments: 6 },
+    settings: {
+      gridSize: 2,
+      snapEnabled: true,
+      connectionMode: "oneway",
+      curveSegments: 6,
+      backgroundOpacity: 0.85,
+      showIcons: true,
+    },
     pendingConnectFrom: null,
     placement: null,
     blueprints: [],
     blueprintEdit: null,
+    background: null,
     dirty: false,
     statusMessage: "Open an AutoDrive_config.xml or start placing nodes",
   };
@@ -187,6 +200,14 @@ export interface AdBridge {
   storeBlueprints(blueprints: Blueprint[]): Promise<boolean>;
   exportBlueprint(blueprint: Blueprint): Promise<{ path: string } | null>;
   importBlueprints(): Promise<unknown[] | null>;
+  readBackground(pathOrFolder: string): Promise<{
+    folder: string;
+    heightmap: Uint8Array;
+    careerXml: string | null;
+    placeablesXml: string | null;
+    vehiclesXml: string | null;
+  } | null>;
+  pickBackgroundFolder(): Promise<string | null>;
   loadSettings(): Promise<Record<string, unknown>>;
   saveSettings(settings: Record<string, unknown>): Promise<boolean>;
   getVersion(): Promise<string>;

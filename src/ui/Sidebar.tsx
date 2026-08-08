@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { exportBlueprintFile, importBlueprintFiles, persistBlueprintLibrary } from "../files/fileio";
+import {
+  exportBlueprintFile,
+  importBlueprintFiles,
+  loadBackgroundFrom,
+  persistBlueprintLibrary,
+  pickBackgroundFolder,
+} from "../files/fileio";
 import { captureBlueprint } from "../model/blueprint";
 import {
   connect,
@@ -427,7 +433,62 @@ function FilePanel() {
       <p className="hint">
         Settings sections of an imported AutoDrive_config.xml are preserved untouched when saving.
       </p>
+      <BackgroundSection />
       <UpdatePanel />
+    </div>
+  );
+}
+
+function BackgroundSection() {
+  const s = useStore();
+  const bg = s.background;
+  return (
+    <div>
+      <h4>Map background</h4>
+      {bg ? (
+        <p className="hint">
+          {bg.mapTitle || "Unknown map"} · {bg.sizeMeters} m · {bg.placeables.length} placeables ·{" "}
+          {bg.vehicles.length} vehicles
+        </p>
+      ) : (
+        <p className="hint">
+          Loaded automatically when you open an AutoDrive_config.xml inside a savegame folder, or pick the folder
+          manually. New nodes get their height from the real terrain.
+        </p>
+      )}
+      <div className="row">
+        <button onClick={() => void pickBackgroundFolder()}>Load savegame folder…</button>
+        {bg && (
+          <>
+            {s.filePath && <button onClick={() => void loadBackgroundFrom(s.filePath!, false)}>Reload</button>}
+            <button className="danger" onClick={() => store.update((st) => (st.background = null))}>
+              Clear
+            </button>
+          </>
+        )}
+      </div>
+      {bg && (
+        <>
+          <label className="col">
+            Opacity: {Math.round(s.settings.backgroundOpacity * 100)}%
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(s.settings.backgroundOpacity * 100)}
+              onChange={(e) => store.update((st) => (st.settings.backgroundOpacity = Number(e.target.value) / 100))}
+            />
+          </label>
+          <label className="row">
+            <input
+              type="checkbox"
+              checked={s.settings.showIcons}
+              onChange={(e) => store.update((st) => (st.settings.showIcons = e.target.checked))}
+            />
+            Show placeables &amp; vehicles
+          </label>
+        </>
+      )}
     </div>
   );
 }

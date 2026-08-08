@@ -132,6 +132,43 @@ const results = await page.evaluate(async (xmlText) => {
   const re3 = xml.parseAutoDriveXml(xml.serializeAutoDriveXml(net4));
   assert(re3.network.waypoints.get(1).flags === 2, "traffic flag survives roundtrip");
 
+  // ---- savegame background: 16-bit heightmap + terrain sampling ----
+  const bgMod = await import("/src/model/background.ts");
+  const png16 = await import("/src/model/png16.ts");
+  const hmBytes = new Uint8Array(await (await fetch("/tests/assets/terrain.heightmap.png")).arrayBuffer());
+  const hm = await png16.decodeGray16Png(hmBytes);
+  assert(hm.width === 2049 && hm.height === 2049, `heightmap decoded 2049x2049, got ${hm.width}x${hm.height}`);
+  let hmMin = 0xffff;
+  let hmMax = 0;
+  for (const v of hm.data) {
+    if (v < hmMin) hmMin = v;
+    if (v > hmMax) hmMax = v;
+  }
+  // flat map: all heights within ~128±0.1 m (32890..32904 in 16-bit units)
+  assert(hmMin >= 32880 && hmMax <= 32910, `flat-map height values in [32880,32910], got [${hmMin},${hmMax}]`);
+  const background = await bgMod.buildBackground({
+    heightmap: hmBytes,
+    careerXml: "<careerSavegame><settings><mapTitle>Flat MAP</mapTitle></settings></careerSavegame>",
+    placeablesXml:
+      '<placeables><placeable filename="data/placeables/mapUS/trailerHouse/trailerHouse.xml" position="-296.356 128.000 -168.160"/></placeables>',
+    vehiclesXml:
+      '<vehicles><vehicle filename="data/vehicles/fendt/vario900/vario900.xml"><component1 position="-287.061 127.974 -55.177"/></vehicle></vehicles>',
+  });
+  assert(background.sizeMeters === 2048, "map size derived as 2048 m");
+  assert(background.mapTitle === "Flat MAP", "map title parsed");
+  assert(background.canvas.width === 2049, "hillshade canvas rendered");
+  assert(background.placeables.length === 1 && background.placeables[0].label === "trailerHouse", "placeable icon parsed");
+  assert(
+    background.vehicles.length === 1 && background.vehicles[0].label === "vario900" && Math.abs(background.vehicles[0].z + 55.177) < 1e-6,
+    "vehicle position from child component"
+  );
+  // real savegame ground truth: placeables sit at y=128.000 on this map
+  const th = bgMod.terrainHeightAt(background, -296.356, -168.16);
+  assert(th !== null && Math.abs(th - 128) < 0.1, `terrain height ~128 m at placeable, got ${th}`);
+  assert(bgMod.terrainHeightAt(background, 5000, 0) === null, "outside-map sampling returns null");
+  const netForY = { waypoints: new Map(), markers: [], groups: ["All"], mapName: "", routeAuthor: "", routeVersion: "", nextId: 1 };
+  assert(Math.abs(bgMod.nodeHeightAt(background, netForY, 10, 10) - 128) < 0.1, "new node height from terrain");
+
   // ---- update channel logic ----
   const upd = await import("/src/model/updates.ts");
   assert(upd.compareVersions("0.1.0", "0.1.0") === 0, "semver equal");

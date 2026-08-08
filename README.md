@@ -18,6 +18,7 @@ A desktop editor for route networks of the [AutoDrive](https://github.com/Stepha
 - **Flags** — toggle subprio (pathfinding cost ×20) and traffic-system flags per selection; subprio nodes render yellow.
 - **Markers & groups** — create, rename, and delete map markers and organize them into groups.
 - **Route tools** — insert midpoint on a connection, distribute a run of nodes evenly, generate a smooth curve between two nodes (tangents follow the adjoining roads).
+- **Savegame map background** — opening an `AutoDrive_config.xml` inside a savegame folder automatically renders the map's terrain under the network: a hillshaded elevation view decoded from the save's 16-bit `terrain.heightmap.png`, plus placeable and vehicle icons from the save. New nodes get their height (`y`) sampled from the real terrain. Opacity and icons are adjustable in the File tab; a folder can also be picked manually.
 
 ## Usage
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { nodeHeightAt } from "../model/background";
 import { placedPositions, stampBlueprint } from "../model/blueprint";
 import {
   addWaypoint,
@@ -7,7 +8,6 @@ import {
   connectAcrossGrid,
   connectionBetween,
   cycleConnection,
-  estimateY,
 } from "../model/graph";
 import { FLAG_SUBPRIO, RouteNetwork, Waypoint } from "../model/types";
 import { store } from "../state/store";
@@ -121,6 +121,19 @@ export function EditorCanvas({ onCursor }: { onCursor: (x: number, z: number) =>
     ctx.fillStyle = s.blueprintEdit ? COLORS.backgroundBlueprint : COLORS.background;
     ctx.fillRect(0, 0, w, h);
 
+    // terrain background from the savegame (not in the blueprint workspace)
+    if (s.background && !s.blueprintEdit) {
+      const half = s.background.sizeMeters / 2;
+      const x0 = toSX(-half);
+      const y0 = toSY(-half);
+      const size = s.background.sizeMeters * view.scale;
+      ctx.globalAlpha = s.settings.backgroundOpacity;
+      ctx.imageSmoothingEnabled = view.scale < 1;
+      ctx.drawImage(s.background.canvas, x0, y0, size, size);
+      ctx.imageSmoothingEnabled = true;
+      ctx.globalAlpha = 1;
+    }
+
     // grid
     const grid = s.settings.gridSize;
     if (grid > 0 && grid * view.scale >= 6) {
@@ -184,6 +197,33 @@ export function EditorCanvas({ onCursor }: { onCursor: (x: number, z: number) =>
         ctx.lineTo(toSX(ghostPosRef.current.x), toSY(ghostPosRef.current.z));
         ctx.stroke();
         ctx.setLineDash([]);
+      }
+    }
+
+    // placeable / vehicle icons from the savegame
+    if (s.background && !s.blueprintEdit && s.settings.showIcons) {
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      for (const icon of s.background.placeables) {
+        const sx = toSX(icon.x);
+        const sy = toSY(icon.z);
+        if (!visible(sx, sy)) continue;
+        ctx.fillStyle = "rgba(240,240,255,0.9)";
+        ctx.fillRect(sx - 4, sy - 4, 8, 8);
+        if (view.scale > 1.5 && icon.label) ctx.fillText(icon.label, sx, sy - 8);
+      }
+      for (const icon of s.background.vehicles) {
+        const sx = toSX(icon.x);
+        const sy = toSY(icon.z);
+        if (!visible(sx, sy)) continue;
+        ctx.fillStyle = "rgba(120,200,255,0.9)";
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - 5);
+        ctx.lineTo(sx + 5, sy + 4);
+        ctx.lineTo(sx - 5, sy + 4);
+        ctx.closePath();
+        ctx.fill();
+        if (view.scale > 1.5 && icon.label) ctx.fillText(icon.label, sx, sy - 8);
       }
     }
 
@@ -364,7 +404,7 @@ export function EditorCanvas({ onCursor }: { onCursor: (x: number, z: number) =>
         const px = store.snap(x);
         const pz = store.snap(z);
         store.mutate((st) => {
-          const y = estimateY(st.network, px, pz);
+          const y = nodeHeightAt(st.blueprintEdit ? null : st.background, st.network, px, pz);
           const wp = addWaypoint(st.network, px, y, pz);
           const prev = lastAddedRef.current;
           if (ev.ctrlKey && prev !== null && st.network.waypoints.has(prev)) {
@@ -417,7 +457,7 @@ export function EditorCanvas({ onCursor }: { onCursor: (x: number, z: number) =>
         const pz = store.snap(z);
         const placement = s.placement;
         store.mutate((st) => {
-          const baseY = estimateY(st.network, px, pz);
+          const baseY = nodeHeightAt(st.blueprintEdit ? null : st.background, st.network, px, pz);
           const ids = stampBlueprint(st.network, placement.blueprint, { x: px, z: pz, rotation: placement.rotation }, baseY);
           st.selection = new Set(ids);
           st.statusMessage = `Placed "${placement.blueprint.name}" (${ids.length} nodes) — click to stamp again, Esc to finish`;

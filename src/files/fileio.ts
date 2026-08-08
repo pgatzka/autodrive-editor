@@ -1,3 +1,4 @@
+import { buildBackground } from "../model/background";
 import { parseAutoDriveXml, serializeAutoDriveXml } from "../model/xml";
 import { bridge, store } from "../state/store";
 import { Blueprint } from "../model/types";
@@ -44,6 +45,36 @@ function applyOpenedXml(path: string | undefined, content: string) {
   store.notify();
 }
 
+/**
+ * Load the terrain background from a savegame folder (or any file inside one).
+ * Silently does nothing when quiet and the folder has no heightmap.
+ */
+export async function loadBackgroundFrom(pathOrFolder: string, quiet: boolean) {
+  const b = bridge();
+  if (!b) return;
+  try {
+    const files = await b.readBackground(pathOrFolder);
+    if (!files) {
+      if (!quiet) store.update((s) => (s.statusMessage = "No terrain.heightmap.png found in that folder"));
+      return;
+    }
+    const bg = await buildBackground(files);
+    store.update((s) => {
+      s.background = bg;
+      s.statusMessage = `Background loaded: ${bg.mapTitle || "map"} (${bg.sizeMeters} m, ${bg.placeables.length} placeables, ${bg.vehicles.length} vehicles)`;
+    });
+  } catch (err) {
+    if (!quiet) store.update((s) => (s.statusMessage = `Background failed: ${err instanceof Error ? err.message : err}`));
+  }
+}
+
+export async function pickBackgroundFolder() {
+  const b = bridge();
+  if (!b) return;
+  const folder = await b.pickBackgroundFolder();
+  if (folder) await loadBackgroundFrom(folder, false);
+}
+
 export async function openConfig() {
   const b = bridge();
   if (b) {
@@ -51,6 +82,8 @@ export async function openConfig() {
     if (!result) return;
     try {
       applyOpenedXml(result.path, result.content);
+      // configs live inside the savegame folder — pick up the terrain background automatically
+      void loadBackgroundFrom(result.path, true);
     } catch (err) {
       store.update((s) => (s.statusMessage = `Open failed: ${err instanceof Error ? err.message : err}`));
     }

@@ -126,6 +126,45 @@ ipcMain.handle("blueprints:import", async (event) => {
   return imported;
 });
 
+// ---------- IPC: savegame background ----------
+
+// Accepts a savegame folder or any file inside it (e.g. the opened
+// AutoDrive_config.xml) and returns the background-relevant files.
+ipcMain.handle("background:read", async (event, { pathOrFolder }) => {
+  let folder = pathOrFolder;
+  try {
+    if (fs.statSync(folder).isFile()) folder = path.dirname(folder);
+  } catch {
+    return null;
+  }
+  const heightmapPath = path.join(folder, "terrain.heightmap.png");
+  if (!fs.existsSync(heightmapPath)) return null;
+  const readText = (name) => {
+    try {
+      return fs.readFileSync(path.join(folder, name), "utf-8");
+    } catch {
+      return null;
+    }
+  };
+  return {
+    folder,
+    heightmap: fs.readFileSync(heightmapPath),
+    careerXml: readText("careerSavegame.xml"),
+    placeablesXml: readText("placeables.xml"),
+    vehiclesXml: readText("vehicles.xml"),
+  };
+});
+
+ipcMain.handle("background:pickFolder", async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win, {
+    title: "Pick a savegame folder",
+    properties: ["openDirectory"],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
+});
+
 // ---------- IPC: app settings (update channel, token, ...) ----------
 
 ipcMain.handle("settings:load", async () => {
