@@ -133,11 +133,15 @@ jobs:
         # run's draft can never be deleted by an older run finishing late
         run: |
           TAG="v${VERSION}"
+          # match on tag OR name: drafts created without an explicit tag carry a
+          # placeholder tag_name (untagged-...) and only the name has the version
           gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
             | jq -r --arg tag "$TAG" --argjson cur "${GITHUB_RUN_NUMBER}" '
                 .[]
-                | select(.draft and (.tag_name | test("-dev\\.")) and .tag_name != $tag)
-                | select(((.tag_name | capture("-dev\\.(?<n>[0-9]+)")).n | tonumber) < $cur)
+                | select(.draft and .tag_name != $tag)
+                | (((.name // "") + " " + (.tag_name // ""))) as $label
+                | select($label | test("-dev\\."))
+                | select(($label | capture("-dev\\.(?<n>[0-9]+)").n | tonumber) < $cur)
                 | .id' \
             | while read -r id; do
                 echo "Deleting stale dev draft id $id"

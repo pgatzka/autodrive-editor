@@ -165,9 +165,14 @@ ipcMain.handle("update:check", async (event, { token }) => {
     throw new Error(`GitHub API error: HTTP ${res.status}${res.status === 401 ? " (invalid token?)" : ""}`);
   }
   const releases = await res.json();
-  return releases.map((r) => ({
-    tag: r.tag_name,
-    version: String(r.tag_name || "").replace(/^v/, ""),
+  return releases.map((r) => {
+    const rawTag = String(r.tag_name || "");
+    // drafts created without an explicit tag get a placeholder tag_name; the
+    // version is then only in the release name
+    const versionSource = !rawTag || /^untagged-/.test(rawTag) ? String(r.name || "") : rawTag;
+    return {
+    tag: rawTag,
+    version: versionSource.replace(/^v/, ""),
     name: r.name || r.tag_name,
     draft: !!r.draft,
     prerelease: !!r.prerelease,
@@ -182,7 +187,8 @@ ipcMain.handle("update:check", async (event, { token }) => {
       // the asset API endpoint works for drafts (with token) and public releases alike
       apiUrl: a.url,
     })),
-  }));
+    };
+  });
 });
 
 ipcMain.handle("update:download", async (event, { asset, token }) => {
