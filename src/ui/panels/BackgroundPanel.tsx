@@ -1,4 +1,5 @@
 import { loadBackgroundFrom, pickBackgroundFolder } from "../../files/fileio";
+import { hectares, setShowFields } from "../../state/actions";
 import { store } from "../../state/store";
 import { useStore } from "../../state/useStore";
 import { Button, Section, Toggle } from "../components/controls";
@@ -58,6 +59,17 @@ export function BackgroundPanel() {
             label="Show placeables & vehicles"
             checked={state.settings.showIcons}
             onChange={(checked) => store.update((s) => (s.settings.showIcons = checked))}
+          />
+          {/* plowing paints only a field's edge, so the worked ground is what those edges enclose */}
+          <Toggle
+            label="Shade worked ground"
+            hint={
+              background.fields
+                ? `${hectares(background.fields.cells)} ha of fields and yards found`
+                : "no fenced-in ground found on this map"
+            }
+            checked={state.settings.showFields}
+            onChange={(checked) => setShowFields(checked)}
           />
         </>
       )}

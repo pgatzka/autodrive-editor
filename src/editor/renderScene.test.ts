@@ -287,6 +287,8 @@ describe("renderScene", () => {
         mapTitle: "Test",
         placeables: [{ x: 0, z: 0, label: "silo" }],
         vehicles: [{ x: 10, z: 10, label: "tractor" }],
+        typeLayer: null,
+        fields: null,
         hasGroundTextures: true,
       };
     });
@@ -308,6 +310,8 @@ describe("renderScene", () => {
         mapTitle: "Test",
         placeables: [],
         vehicles: [],
+        typeLayer: null,
+        fields: null,
         hasGroundTextures: true,
       };
     });
@@ -337,6 +341,8 @@ describe("renderScene", () => {
         mapTitle: "Test",
         placeables: [{ x: 0, z: 0, label: "silo" }],
         vehicles: [],
+        typeLayer: null,
+        fields: null,
         hasGroundTextures: false,
       };
     });

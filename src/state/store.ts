@@ -50,6 +50,8 @@ export interface EditorSettings {
   curveSegments: number;
   backgroundOpacity: number;
   showIcons: boolean;
+  /** shade ground that painted edges wall in — plowed fields and yards */
+  showFields: boolean;
 }
 
 /**
@@ -160,6 +162,7 @@ export class EditorStore {
       curveSegments: 6,
       backgroundOpacity: 0.85,
       showIcons: true,
+      showFields: true,
     },
     pendingConnectFrom: null,
     placement: null,

@@ -61,18 +61,28 @@ const SURFACE_TONES: Rgb[] = [
  * surface and share a tone, which is also how they read in game.
  */
 export function buildTypePalette(types: Uint8Array): Map<number, Rgb> {
-  const counts = countIndices(types);
-  const surfaces = groupConsecutive(Array.from(counts.keys()));
-
-  // biggest surface first, so the dominant ground gets the grass tone
-  surfaces.sort((a, b) => coverage(b, counts) - coverage(a, counts));
-
   const palette = new Map<number, Rgb>();
-  surfaces.forEach((surface, rank) => {
+  rankedSurfaces(types).forEach((surface, rank) => {
     const tone = SURFACE_TONES[rank % SURFACE_TONES.length];
     for (const index of surface) palette.set(index, tone);
   });
   return palette;
+}
+
+/** Surfaces of the map, most ground covered first. */
+export function rankedSurfaces(types: Uint8Array): number[][] {
+  const counts = countIndices(types);
+  const surfaces = groupConsecutive(Array.from(counts.keys()));
+  return surfaces.sort((a, b) => coverage(b, counts) - coverage(a, counts));
+}
+
+/**
+ * The surface the map is mostly made of — grass on a farm map. Everything
+ * else has been painted on top of it by the map maker or the player.
+ */
+export function dominantSurface(types: Uint8Array): Set<number> {
+  const surfaces = rankedSurfaces(types);
+  return new Set(surfaces.length > 0 ? surfaces[0] : []);
 }
 
 function countIndices(types: Uint8Array): Map<number, number> {

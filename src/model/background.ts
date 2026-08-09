@@ -1,9 +1,10 @@
+import { FieldAreas, findEnclosedAreas } from "./fields";
 import { estimateY } from "./graph";
 import { decodeGray16Png } from "./png16";
 import { parseMapTitle, parseWorldIcons, WorldIcon } from "./savegameXml";
 import { createHeightfield, Heightfield, heightAt } from "./terrain";
 import { renderTerrainImage, toCanvas } from "./terrainImage";
-import { parseTerrainTypeCache, TerrainTypeLayer } from "./terrainTypes";
+import { dominantSurface, parseTerrainTypeCache, TerrainTypeLayer } from "./terrainTypes";
 import { RouteNetwork } from "./types";
 
 /**
@@ -25,6 +26,10 @@ export interface BackgroundFiles {
 export interface SavegameBackground {
   canvas: HTMLCanvasElement;
   field: Heightfield;
+  /** painted textures, kept so the raster can be repainted */
+  typeLayer: TerrainTypeLayer | null;
+  /** ground walled in by painted edges — plowed fields and yards */
+  fields: FieldAreas | null;
   /** world extent per edge, in meters (origin at the center) */
   sizeMeters: number;
   mapTitle: string;
@@ -41,16 +46,28 @@ export async function buildBackground(files: BackgroundFiles): Promise<SavegameB
   }
   const field = createHeightfield(image.data, image.width);
   const typeLayer = readTypeLayer(files.typeCache);
+  const fields = typeLayer ? findEnclosedAreas(typeLayer, dominantSurface(typeLayer.types)) : null;
 
   return {
-    canvas: toCanvas(renderTerrainImage(field, typeLayer)),
+    canvas: toCanvas(renderTerrainImage(field, typeLayer, fields)),
     field,
+    typeLayer,
+    fields,
     sizeMeters: field.sizeMeters,
     mapTitle: files.careerXml ? parseMapTitle(files.careerXml) : "",
     placeables: files.placeablesXml ? parseWorldIcons(files.placeablesXml, "placeable") : [],
     vehicles: files.vehiclesXml ? parseWorldIcons(files.vehiclesXml, "vehicle") : [],
     hasGroundTextures: typeLayer !== null,
   };
+}
+
+/**
+ * Repaint the raster with fields shown or hidden. Cheap enough to do on a
+ * toggle — the parsing, which is the expensive part, is already done.
+ */
+export function repaintBackground(background: SavegameBackground, showFields: boolean): HTMLCanvasElement {
+  const fields = showFields ? background.fields : null;
+  return toCanvas(renderTerrainImage(background.field, background.typeLayer, fields));
 }
 
 /** Terrain height in meters at world (x, z); null outside the map. */

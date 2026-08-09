@@ -12,9 +12,11 @@ import {
   disconnectNodes,
   focusOnWaypoint,
   gridRoute,
+  hectares,
   insertMidpointBetween,
   mergeStackedNodes,
   resetGridOffset,
+  setShowFields,
   selectAll,
   setSelection,
   setSelectionFlag,
@@ -302,5 +304,52 @@ describe("mergeStackedNodes", () => {
     expect(store.state.statusMessage).toBe("No stacked nodes found");
     expect(store.getVersion()).toBe(version + 1);
     expect(store.state.network.waypoints.size).toBe(1);
+  });
+});
+
+describe("setShowFields", () => {
+  /** A background whose raster can be repainted, as buildBackground produces. */
+  function backgroundWithFields() {
+    const field = { samples: 2, sizeMeters: 1, values: new Uint16Array([0, 0, 0, 0]) };
+    return {
+      canvas: document.createElement("canvas"),
+      field,
+      typeLayer: { size: 2, types: new Uint8Array([7, 7, 7, 7]) },
+      fields: { size: 2, enclosed: new Uint8Array([0, 1, 0, 0]), cells: 12345 },
+      sizeMeters: 1,
+      mapTitle: "Test",
+      placeables: [],
+      vehicles: [],
+      hasGroundTextures: true,
+    };
+  }
+
+  it("repaints the background and reports the area", () => {
+    store.update((s) => (s.background = backgroundWithFields() as never));
+    const before = store.state.background!.canvas;
+
+    setShowFields(false);
+    expect(store.state.settings.showFields).toBe(false);
+    expect(store.state.background!.canvas).not.toBe(before);
+    expect(store.state.statusMessage).toBe("Fields hidden");
+
+    setShowFields(true);
+    expect(store.state.statusMessage).toMatch(/1\.23 ha/);
+  });
+
+  it("works with no background loaded", () => {
+    store.update((s) => (s.background = null));
+
+    setShowFields(true);
+
+    expect(store.state.statusMessage).toBe("Fields hidden");
+  });
+});
+
+describe("hectares", () => {
+  it("turns square meters into what a farmer reads", () => {
+    expect(hectares(10000)).toBe(1);
+    expect(hectares(120324)).toBe(12.03);
+    expect(hectares(0)).toBe(0);
   });
 });

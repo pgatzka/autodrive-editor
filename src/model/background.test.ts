@@ -5,6 +5,7 @@ import { decodeGray16Png } from "./png16";
 import { parseMapTitle, parseWorldIcons } from "./savegameXml";
 import { createHeightfield, heightAt, HEIGHT_SCALE } from "./terrain";
 import { renderTerrainImage } from "./terrainImage";
+import { dominantSurface } from "./terrainTypes";
 import { buildTypePalette, parseTerrainTypeCache, TERRAIN_TYPE_MAGIC } from "./terrainTypes";
 import { emptyNetwork } from "./types";
 
@@ -108,6 +109,18 @@ describe("buildTypePalette", () => {
   });
 });
 
+describe("dominantSurface", () => {
+  it("returns the whole dithered pair of the surface covering most ground", () => {
+    const types = new Uint8Array([16, 17, 16, 17, 16, 17, 35, 36]);
+
+    expect(dominantSurface(types)).toEqual(new Set([16, 17]));
+  });
+
+  it("is empty for an empty layer", () => {
+    expect(dominantSurface(new Uint8Array())).toEqual(new Set());
+  });
+});
+
 describe("renderTerrainImage", () => {
   it("uses the type layer resolution and paints every pixel opaque", () => {
     const field = createHeightfield(new Uint16Array(9).fill(32893), 3);
@@ -118,6 +131,22 @@ describe("renderTerrainImage", () => {
     expect(image.width).toBe(2);
     expect(image.pixels).toHaveLength(2 * 2 * 4);
     expect(image.pixels[3]).toBe(255);
+  });
+
+  it("paints worked ground in its own tone", () => {
+    const field = createHeightfield(new Uint16Array(9).fill(32893), 3);
+    const layer = parseTerrainTypeCache(makeTypeCache(2, [7, 7, 7, 7]));
+    const fields = { size: 2, enclosed: new Uint8Array([0, 1, 0, 0]), cells: 1 };
+
+    const image = renderTerrainImage(field, layer, fields);
+
+    const pixel = (i: number) => [image.pixels[i * 4], image.pixels[i * 4 + 1], image.pixels[i * 4 + 2]];
+    expect(pixel(1)).not.toEqual(pixel(0));
+    // soil reads warmer than the ground it is cut out of
+    expect(pixel(1)[0]).toBeGreaterThan(pixel(1)[2]);
+    // and hiding fields puts the cell back to its painted colour
+    const plain = renderTerrainImage(field, layer, null);
+    expect([plain.pixels[4], plain.pixels[5], plain.pixels[6]]).toEqual(pixel(0));
   });
 
   it("falls back to an elevation tint without a type layer", () => {

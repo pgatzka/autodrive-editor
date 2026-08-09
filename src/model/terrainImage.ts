@@ -1,3 +1,4 @@
+import { FieldAreas } from "./fields";
 import { Heightfield, HEIGHT_SCALE, heightRange } from "./terrain";
 import { buildTypePalette, Rgb, TerrainTypeLayer } from "./terrainTypes";
 
@@ -22,8 +23,14 @@ const DIFFUSE = 0.45;
 /** Elevation tint endpoints used when no painted-texture layer exists. */
 const VALLEY: Rgb = [56, 88, 62];
 const HIGHLAND: Rgb = [148, 144, 106];
+/** Worked ground, told apart from the meadow it is cut out of. */
+export const FIELD_TONE: Rgb = [138, 104, 68];
 
-export function renderTerrainImage(field: Heightfield, typeLayer: TerrainTypeLayer | null): RgbaImage {
+export function renderTerrainImage(
+  field: Heightfield,
+  typeLayer: TerrainTypeLayer | null,
+  fields: FieldAreas | null = null
+): RgbaImage {
   const size = typeLayer ? typeLayer.size : field.samples;
   const palette = typeLayer ? buildTypePalette(typeLayer.types) : null;
   const pixels = new Uint8ClampedArray(new ArrayBuffer(size * size * 4));
@@ -39,10 +46,10 @@ export function renderTerrainImage(field: Heightfield, typeLayer: TerrainTypeLay
     for (let col = 0; col < size; col++) {
       const hx = Math.min(Math.round(col * heightStep), field.samples - 1);
       const shade = hillshade(field, hx, hz, lightLen);
+      const cell = row * size + col;
       const color =
-        palette !== null && typeLayer !== null
-          ? palette.get(typeLayer.types[row * typeLayer.size + col])!
-          : elevationTint(field.values[hz * field.samples + hx], min, range);
+        surfaceColor(cell, typeLayer, palette, fields) ??
+        elevationTint(field.values[hz * field.samples + hx], min, range);
 
       const offset = (row * size + col) * 4;
       pixels[offset] = color[0] * shade;
@@ -52,6 +59,18 @@ export function renderTerrainImage(field: Heightfield, typeLayer: TerrainTypeLay
     }
   }
   return { width: size, height: size, pixels };
+}
+
+/** Field first, then the painted texture; null when there is no texture layer. */
+function surfaceColor(
+  cell: number,
+  typeLayer: TerrainTypeLayer | null,
+  palette: Map<number, Rgb> | null,
+  fields: FieldAreas | null
+): Rgb | null {
+  if (fields && fields.enclosed[cell] === 1) return FIELD_TONE;
+  if (!typeLayer || !palette) return null;
+  return palette.get(typeLayer.types[cell]) ?? null;
 }
 
 function hillshade(field: Heightfield, x: number, z: number, lightLen: number): number {

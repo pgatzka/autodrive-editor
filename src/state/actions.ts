@@ -1,4 +1,4 @@
-import { nodeHeightAt } from "../model/background";
+import { nodeHeightAt, repaintBackground } from "../model/background";
 import { blueprintSpan, captureBlueprint, centroidOf, stampBlueprint } from "../model/blueprint";
 import {
   addWaypoint,
@@ -389,6 +389,21 @@ export function resetGridOffset(): void {
     s.settings.gridOffsetZ = 0;
     s.statusMessage = "Grid offset reset";
   });
+}
+
+/** Fields are baked into the background raster, so the toggle repaints it. */
+export function setShowFields(show: boolean): void {
+  store.update((s) => {
+    s.settings.showFields = show;
+    if (s.background) s.background = { ...s.background, canvas: repaintBackground(s.background, show) };
+    const area = s.background?.fields?.cells ?? 0;
+    s.statusMessage = show && area > 0 ? `Fields shaded (${hectares(area)} ha)` : "Fields hidden";
+  });
+}
+
+/** Cells are square meters; hectares are what a farmer reads. */
+export function hectares(cells: number): number {
+  return Math.round(cells / 100) / 100;
 }
 
 export function focusOnWaypoint(wpId: number): void {
