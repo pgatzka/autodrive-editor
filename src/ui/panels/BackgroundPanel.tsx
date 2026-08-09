@@ -60,13 +60,13 @@ export function BackgroundPanel() {
             checked={state.settings.showIcons}
             onChange={(checked) => store.update((s) => (s.settings.showIcons = checked))}
           />
-          {/* plowing paints only a field's edge, so the worked ground is what those edges enclose */}
+          {/* plowing paints only a field's edge, so all the editor can show is what those edges ring in */}
           <Toggle
-            label="Shade worked ground"
+            label="Shade ground inside tracks"
             hint={
               background.fields
-                ? `${hectares(background.fields.cells)} ha of fields and yards found`
-                : "no fenced-in ground found on this map"
+                ? `${hectares(background.fields.cells)} ha ringed by tracks — a grass margin inside the ring is shaded with the field`
+                : "no ringed-in ground found on this map"
             }
             checked={state.settings.showFields}
             onChange={(checked) => setShowFields(checked)}

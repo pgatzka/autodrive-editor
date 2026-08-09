@@ -8,8 +8,12 @@ import { TerrainTypeLayer } from "./terrainTypes";
  * invisible in the texture layer as a filled shape. What gives it away is the
  * enclosure — a patch of natural ground that cannot be reached from the edge
  * of the map without crossing painted ground is a field, a yard, or an
- * enclosure of some other kind. That is exactly the distinction a route
- * planner wants: worked land, not the meadow around it.
+ * enclosure of some other kind.
+ *
+ * What this cannot do is find the edge of the plowing itself. A grass margin
+ * left between a field and its track is the same natural ground as the field
+ * beside it, byte for byte, so it is shaded along with the field. Only the
+ * savegame's plow layer knows where the worked ground actually stops.
  *
  * Maps that do paint their fields need none of this; those surfaces already
  * come out of the palette as their own colour.

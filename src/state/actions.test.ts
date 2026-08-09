@@ -331,7 +331,7 @@ describe("setShowFields", () => {
     setShowFields(false);
     expect(store.state.settings.showFields).toBe(false);
     expect(store.state.background!.canvas).not.toBe(before);
-    expect(store.state.statusMessage).toBe("Fields hidden");
+    expect(store.state.statusMessage).toBe("Enclosed ground not shaded");
 
     setShowFields(true);
     expect(store.state.statusMessage).toMatch(/1\.23 ha/);
@@ -342,7 +342,7 @@ describe("setShowFields", () => {
 
     setShowFields(true);
 
-    expect(store.state.statusMessage).toBe("Fields hidden");
+    expect(store.state.statusMessage).toBe("Enclosed ground not shaded");
   });
 });
 

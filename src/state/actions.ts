@@ -397,7 +397,8 @@ export function setShowFields(show: boolean): void {
     s.settings.showFields = show;
     if (s.background) s.background = { ...s.background, canvas: repaintBackground(s.background, show) };
     const area = s.background?.fields?.cells ?? 0;
-    s.statusMessage = show && area > 0 ? `Fields shaded (${hectares(area)} ha)` : "Fields hidden";
+    s.statusMessage =
+      show && area > 0 ? `Shading ${hectares(area)} ha ringed by tracks` : "Enclosed ground not shaded";
   });
 }
 
