@@ -18,6 +18,8 @@ export const CANVAS_COLORS = {
   node: "#E9F0EE",
   nodeCore: "#0E1213",
   nodeSubprio: "#F2A93B",
+  /** traffic-system nodes carry a collar, so the flag reads without selecting */
+  nodeTraffic: "#B07CF5",
   nodeSelected: "#4EC9F5",
   pending: "#FFFFFF",
   /** dark casing under every link, so lines read over any terrain tint */

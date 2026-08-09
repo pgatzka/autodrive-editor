@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { captureBlueprint } from "../model/blueprint";
 import { addWaypoint, connect } from "../model/graph";
-import { emptyNetwork, FLAG_SUBPRIO } from "../model/types";
+import { emptyNetwork, FLAG_SUBPRIO, FLAG_TRAFFIC_SYSTEM } from "../model/types";
 import { store } from "../state/store";
 import { renderScene } from "./renderScene";
 import {
@@ -406,5 +406,42 @@ describe("canvas sizing rules", () => {
     expect(casingWidth(4)).toBe(linkWidth(4) + 3);
     expect(chevronSpacing(0.01)).toBe(16);
     expect(chevronSpacing(1000)).toBeCloseTo(9 * 3.4);
+  });
+});
+
+describe("waypoint flags", () => {
+  /** Draw one waypoint carrying `flags` and report what the canvas was told. */
+  function drawWith(flags: number) {
+    store.update((s) => {
+      s.network = emptyNetwork();
+      addWaypoint(s.network, 0, 0, 0, flags);
+    });
+    const { ctx, styles, ops } = recordingContext();
+    renderScene(ctx, store.state, VIEWPORT, NO_OVERLAYS);
+    return { styles, ops: ops() };
+  }
+
+  it("gives a traffic-system node a collar no other node has", () => {
+    expect(drawWith(FLAG_TRAFFIC_SYSTEM).styles).toContain(CANVAS_COLORS.nodeTraffic);
+    expect(drawWith(0).styles).not.toContain(CANVAS_COLORS.nodeTraffic);
+    expect(drawWith(FLAG_SUBPRIO).styles).not.toContain(CANVAS_COLORS.nodeTraffic);
+  });
+
+  it("keeps subprio a filled square and a plain node a disc", () => {
+    const rects = (flags: number) => drawWith(flags).ops.filter((op) => op === "fillRect").length;
+
+    expect(drawWith(FLAG_SUBPRIO).styles).toContain(CANVAS_COLORS.nodeSubprio);
+    // the field itself is a fillRect, so the square is the one on top of it
+    expect(rects(FLAG_SUBPRIO)).toBe(rects(0) + 1);
+  });
+
+  it("shows both flags at once, since a node can carry both", () => {
+    const both = drawWith(FLAG_SUBPRIO | FLAG_TRAFFIC_SYSTEM);
+
+    expect(both.styles).toContain(CANVAS_COLORS.nodeSubprio);
+    expect(both.styles).toContain(CANVAS_COLORS.nodeTraffic);
+    expect(both.ops.filter((op) => op === "fillRect").length).toBe(
+      drawWith(0).ops.filter((op) => op === "fillRect").length + 1
+    );
   });
 });

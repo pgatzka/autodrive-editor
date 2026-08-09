@@ -1,5 +1,11 @@
 import { connectionBetween } from "../../model/graph";
-import { FLAG_SUBPRIO, FLAG_TRAFFIC_SYSTEM, Waypoint } from "../../model/types";
+import { CANVAS_COLORS } from "../../editor/theme";
+import {
+  FLAG_SUBPRIO,
+  FLAG_TRAFFIC_SYSTEM,
+  FLAG_TRAFFIC_SYSTEM_CONNECTION,
+  Waypoint,
+} from "../../model/types";
 import { wrapOffset } from "../../model/grid";
 import { plural } from "../../model/text";
 import {
@@ -26,6 +32,9 @@ import { MarkerEditor } from "./MarkerEditor";
  * waypoints stay in place and disabled rather than appearing, so nothing
  * under the cursor moves as the selection changes.
  */
+/** Either traffic-system flag puts a node in the traffic system. */
+const TRAFFIC_FLAGS = FLAG_TRAFFIC_SYSTEM | FLAG_TRAFFIC_SYSTEM_CONNECTION;
+
 export function SelectionPanel() {
   const state = useStore();
   const selected = Array.from(state.selection)
@@ -94,6 +103,7 @@ function Coordinate({ label, value }: { label: string; value: number }) {
 /** For a set, coordinates are meaningless — the count becomes the headline. */
 function GroupIdentity({ selected }: { selected: Waypoint[] }) {
   const subprio = selected.filter((waypoint) => (waypoint.flags & FLAG_SUBPRIO) !== 0).length;
+  const traffic = selected.filter((waypoint) => (waypoint.flags & TRAFFIC_FLAGS) !== 0).length;
   const state = useStore();
   const links = countLinks(
     selected.map((waypoint) => waypoint.id),
@@ -106,14 +116,19 @@ function GroupIdentity({ selected }: { selected: Waypoint[] }) {
         <span className="value">{selected.length}</span>
         <span className="unit">waypoints selected</span>
       </div>
+      {/* the swatches are the canvas colours, so the panel and the map agree */}
       <div className="stat-row">
         <span className="stat">
-          <span className="swatch" style={{ background: "#E9F0EE" }} />
+          <span className="swatch" style={{ background: CANVAS_COLORS.node }} />
           {selected.length - subprio} normal
         </span>
         <span className="stat">
-          <span className="swatch" style={{ background: "var(--accent)" }} />
+          <span className="swatch square" style={{ background: CANVAS_COLORS.nodeSubprio }} />
           {subprio} subprio
+        </span>
+        <span className="stat">
+          <span className="swatch ring" style={{ borderColor: CANVAS_COLORS.nodeTraffic }} />
+          {traffic} traffic
         </span>
         <span className="stat">{links} links</span>
       </div>

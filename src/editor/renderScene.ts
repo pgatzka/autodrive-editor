@@ -1,7 +1,13 @@
 import { SavegameBackground } from "../model/background";
 import { firstLineAtOrAfter, Grid, isMajorLine } from "../model/grid";
 import { allEdges } from "../model/graph";
-import { ConnectionMode, FLAG_SUBPRIO, RouteNetwork } from "../model/types";
+import {
+  ConnectionMode,
+  FLAG_SUBPRIO,
+  FLAG_TRAFFIC_SYSTEM,
+  FLAG_TRAFFIC_SYSTEM_CONNECTION,
+  RouteNetwork,
+} from "../model/types";
 import { BLUEPRINT_ORIGIN } from "../state/blueprintSession";
 import { EditorState } from "../state/store";
 import { fillCircle, ScreenPoint, strokeCircle, strokeLine } from "./canvasPrimitives";
@@ -50,6 +56,7 @@ interface NodeState {
   selected: boolean;
   condemned: boolean;
   subprio: boolean;
+  traffic: boolean;
   pending: boolean;
 }
 
@@ -279,6 +286,7 @@ function drawNodes(ctx: CanvasRenderingContext2D, viewport: Viewport, state: Edi
       selected: state.selection.has(waypoint.id),
       condemned: state.pendingDeletion?.has(waypoint.id) ?? false,
       subprio: (waypoint.flags & FLAG_SUBPRIO) !== 0,
+      traffic: (waypoint.flags & (FLAG_TRAFFIC_SYSTEM | FLAG_TRAFFIC_SYSTEM_CONNECTION)) !== 0,
       pending: waypoint.id === state.pendingConnectFrom,
     });
   }
@@ -304,6 +312,13 @@ function drawNode(
       ctx.fillStyle = CANVAS_COLORS.nodeCore;
       fillCircle(ctx, at.x, at.y, radius * 0.5);
     }
+  }
+
+  // the two flags compose: subprio is the shape, traffic system the collar
+  if (node.traffic) {
+    ctx.strokeStyle = CANVAS_COLORS.nodeTraffic;
+    ctx.lineWidth = Math.max(radius * 0.55, 1.25);
+    strokeCircle(ctx, at.x, at.y, radius + ctx.lineWidth / 2 + 0.5);
   }
 
   if (node.selected || node.condemned) {
