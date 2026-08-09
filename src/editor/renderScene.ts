@@ -314,25 +314,33 @@ function drawNode(
     }
   }
 
-  // the two flags compose: subprio is the shape, traffic system the collar
+  // the two flags compose: subprio is the shape, traffic system a halo around
+  // it — wide enough to survive the 2-3 px node of a zoomed-out view
+  const collar = node.traffic ? collarWidth(radius) : 0;
   if (node.traffic) {
     ctx.strokeStyle = CANVAS_COLORS.nodeTraffic;
-    ctx.lineWidth = Math.max(radius * 0.55, 1.25);
-    strokeCircle(ctx, at.x, at.y, radius + ctx.lineWidth / 2 + 0.5);
+    ctx.lineWidth = collar;
+    strokeCircle(ctx, at.x, at.y, radius + collar * 0.85);
   }
 
   if (node.selected || node.condemned) {
     ctx.strokeStyle = node.condemned ? CANVAS_COLORS.danger : CANVAS_COLORS.nodeSelected;
     ctx.lineWidth = 1.5;
-    strokeCircle(ctx, at.x, at.y, radius + 3.5);
+    // clear the halo, so selecting a traffic node does not bury its flag
+    strokeCircle(ctx, at.x, at.y, radius + 3.5 + collar * 1.2);
   }
   if (node.pending) {
     ctx.strokeStyle = CANVAS_COLORS.pending;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([3, 3]);
-    strokeCircle(ctx, at.x, at.y, Math.max(radius + 7, 9));
+    strokeCircle(ctx, at.x, at.y, Math.max(radius + 7 + collar, 9));
     ctx.setLineDash([]);
   }
+}
+
+/** The halo grows with the node but never thins below a legible line. */
+function collarWidth(radius: number): number {
+  return Math.max(radius * 0.75, 2);
 }
 
 function nodeFill(node: NodeState): string {

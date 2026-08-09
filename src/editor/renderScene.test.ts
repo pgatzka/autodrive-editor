@@ -435,6 +435,39 @@ describe("waypoint flags", () => {
     expect(rects(FLAG_SUBPRIO)).toBe(rects(0) + 1);
   });
 
+  it("keeps the collar legible when a node is only a few pixels wide", () => {
+    store.update((s) => {
+      s.network = emptyNetwork();
+      addWaypoint(s.network, 0, 0, 0, FLAG_TRAFFIC_SYSTEM);
+    });
+    const { ctx, strokeWidths } = recordingContext();
+
+    // zoomed right out, where a node is a dot and a hairline ring would vanish
+    renderScene(ctx, store.state, createViewport({ cx: 0, cz: 0, scale: 1 }, 800, 600), NO_OVERLAYS);
+
+    const widths = strokeWidths(CANVAS_COLORS.nodeTraffic).map(Number);
+    expect(widths.length).toBeGreaterThan(0);
+    expect(Math.min(...widths)).toBeGreaterThanOrEqual(2);
+  });
+
+  it("keeps the collar outside the fill and inside the selection ring", () => {
+    store.update((s) => {
+      s.network = emptyNetwork();
+      const wp = addWaypoint(s.network, 0, 0, 0, FLAG_TRAFFIC_SYSTEM);
+      s.selection = new Set([wp.id]);
+    });
+    const { ctx, calls } = recordingContext();
+
+    renderScene(ctx, store.state, VIEWPORT, NO_OVERLAYS);
+
+    // the two rings a selected traffic node draws, in the order they are drawn
+    const radii = calls.filter((call) => call.op === "arc").map((call) => Number(call.args[2]));
+    const collar = radii[radii.length - 2];
+    const selection = radii[radii.length - 1];
+    expect(collar).toBeGreaterThan(nodeRadius(VIEWPORT.scale));
+    expect(selection).toBeGreaterThan(collar);
+  });
+
   it("shows both flags at once, since a node can carry both", () => {
     const both = drawWith(FLAG_SUBPRIO | FLAG_TRAFFIC_SYSTEM);
 
