@@ -10,15 +10,13 @@ import {
   deletionImpact,
   disconnect,
   evenlySpaceChain,
-  findStackedGroups,
   insertMidpoint,
-  MergeResult,
-  mergeStacked,
   orderAsChain,
   setFlagOn,
   smoothCurve,
 } from "../model/graph";
 import { offsetForPosition } from "../model/grid";
+import { findStackedGroups, MergeResult, mergeStacked } from "../model/stacked";
 import { plural } from "../model/text";
 import { ConnectionMode } from "../model/types";
 import { closeDialog, confirmAction, showToast } from "./feedback";
@@ -121,7 +119,7 @@ export function spaceSelectionEvenly(ids: Iterable<number>): void {
  * selected — they are the only evidence left that anything happened.
  */
 export function mergeStackedNodes(): void {
-  const groups = findStackedGroups(store.state.network);
+  const groups = findStackedGroups(store.state.network, store.state.settings.mergeToleranceM);
   if (groups.length === 0) {
     store.update((s) => (s.statusMessage = "No stacked nodes found"));
     return;

@@ -1,5 +1,6 @@
 import { SavegameBackground } from "../model/background";
 import { DEFAULT_MAJOR_EVERY, Grid, snapTo } from "../model/grid";
+import { DEFAULT_STACK_TOLERANCE_M } from "../model/stacked";
 import { Blueprint, ConnectionMode, RouteNetwork, emptyNetwork } from "../model/types";
 
 export type Tool = "select" | "add" | "connect" | "gridroute" | "place";
@@ -43,6 +44,8 @@ export interface EditorSettings {
   /** cells per chunk — every Nth grid line is emphasised */
   gridMajorEvery: number;
   snapEnabled: boolean;
+  /** how close two waypoints must be to count as one spot, in meters */
+  mergeToleranceM: number;
   connectionMode: ConnectionMode;
   curveSegments: number;
   backgroundOpacity: number;
@@ -152,6 +155,7 @@ export class EditorStore {
       gridOffsetZ: 0,
       gridMajorEvery: DEFAULT_MAJOR_EVERY,
       snapEnabled: true,
+      mergeToleranceM: DEFAULT_STACK_TOLERANCE_M,
       connectionMode: "oneway",
       curveSegments: 6,
       backgroundOpacity: 0.85,

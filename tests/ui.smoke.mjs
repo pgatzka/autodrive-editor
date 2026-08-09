@@ -175,8 +175,9 @@ try {
     const { store } = await import("/src/state/store.ts");
     const { addWaypoint, connect } = await import("/src/model/graph.ts");
     store.update((s) => {
-      const keep = addWaypoint(s.network, 0, 100, 0);
-      const dupe = addWaypoint(s.network, 0, 100, 0);
+      addWaypoint(s.network, 0, 100, 0);
+      // 4 cm off, the way two separately drawn routes meet — not an exact copy
+      const dupe = addWaypoint(s.network, 0.04, 100, 0.01);
       const east = addWaypoint(s.network, 20, 100, 0);
       connect(s.network, dupe.id, east.id, "oneway");
     });
@@ -196,6 +197,8 @@ try {
     (await page.locator(".inspector button", { hasText: "No stacked nodes" }).count()) === 1,
     "merge button reports nothing left to do"
   );
+  const tolerance = page.getByRole("textbox", { name: "Stacked node tolerance in meters" });
+  check((await tolerance.inputValue()) === "0.1", "tolerance field shows the default distance");
   await page.locator(".toast", { hasText: "Merged" }).getByRole("button", { name: "Undo" }).click();
   const restored = await page.evaluate(async () => {
     const { store } = await import("/src/state/store.ts");
